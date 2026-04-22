@@ -20,25 +20,30 @@ export default function SignupPage() {
     setError(null);
     setMessage(null);
     setLoading(true);
+
     const supabase = createClient();
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: { full_name: fullName },
-        emailRedirectTo: `${window.location.origin}/dashboard`,
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=/dashboard`,
       },
     });
-    setLoading(false);
+
     if (error) {
+      setLoading(false);
       setError(error.message);
       return;
     }
+
     if (data.session) {
+      await fetch("/api/auth/ensure-org", { method: "POST" });
       router.push("/dashboard");
       router.refresh();
     } else {
-      setMessage("Check your email to confirm. Or sign in if confirmations are off.");
+      setLoading(false);
+      setMessage("Check your email for a confirmation link, then sign in.");
     }
   }
 

@@ -19,11 +19,12 @@ export default function LoginPage() {
     setLoading(true);
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setLoading(false);
     if (error) {
+      setLoading(false);
       setError(error.message);
       return;
     }
+    await fetch("/api/auth/ensure-org", { method: "POST" });
     router.push("/dashboard");
     router.refresh();
   }
