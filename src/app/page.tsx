@@ -20,14 +20,11 @@ export default function Home() {
             <span className="font-mono text-sm tracking-[0.2em] uppercase">OS-INTEL</span>
           </div>
           <div className="flex items-center gap-6 text-sm">
-            <Link href="/login" className="text-ink-200 hover:text-white transition">
-              Sign in
-            </Link>
             <Link
-              href="/signup"
+              href="/dashboard"
               className="bg-amber text-ink-900 px-4 py-2 font-medium hover:bg-amber-bright transition flex items-center gap-1.5"
             >
-              Get access <ArrowUpRight className="w-4 h-4" />
+              Open terminal <ArrowUpRight className="w-4 h-4" />
             </Link>
           </div>
         </nav>
@@ -52,16 +49,10 @@ export default function Home() {
 
           <div className="flex items-center gap-4 mb-24">
             <Link
-              href="/signup"
+              href="/dashboard"
               className="bg-amber text-ink-900 px-6 py-3 font-medium hover:bg-amber-bright transition flex items-center gap-2"
             >
               Open terminal <ArrowUpRight className="w-4 h-4" />
-            </Link>
-            <Link
-              href="/login"
-              className="border border-ink-500 px-6 py-3 hover:border-amber hover:text-amber transition"
-            >
-              Sign in
             </Link>
           </div>
 
