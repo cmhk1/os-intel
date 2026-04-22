@@ -1,6 +1,4 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import {
   LayoutDashboard,
   Ship,
@@ -11,7 +9,6 @@ import {
   Banknote,
   Sparkles,
 } from "lucide-react";
-import SignOutButton from "@/components/SignOutButton";
 import CommandBar from "@/components/CommandBar";
 
 const nav = [
@@ -25,28 +22,11 @@ const nav = [
   { href: "/copilot", label: "Copilot", icon: Sparkles },
 ];
 
-export default async function DashboardLayout({
+export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) redirect("/login");
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name, email, role, organizations(name, slug)")
-    .eq("id", user.id)
-    .single();
-
-  const orgName =
-    (profile?.organizations as unknown as { name?: string } | null)?.name ??
-    "No organization";
-
   return (
     <div className="flex min-h-screen bg-ink text-ink-50">
       {/* Sidebar */}
@@ -65,7 +45,7 @@ export default async function DashboardLayout({
           <div className="text-[10px] font-mono uppercase tracking-wider text-ink-400 mb-1">
             Workspace
           </div>
-          <div className="text-sm truncate">{orgName}</div>
+          <div className="text-sm truncate">Demo Trading Co.</div>
         </div>
 
         {/* Nav */}
@@ -89,17 +69,14 @@ export default async function DashboardLayout({
         <div className="border-t border-ink-600/60 p-2">
           <div className="px-3 py-2 flex items-center gap-3">
             <div className="w-7 h-7 bg-amber/20 border border-amber/40 rounded-sm flex items-center justify-center text-xs font-mono text-amber">
-              {(profile?.full_name || profile?.email || "?")[0].toUpperCase()}
+              D
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-xs truncate">
-                {profile?.full_name || profile?.email}
-              </div>
+              <div className="text-xs truncate">Demo User</div>
               <div className="text-[10px] font-mono uppercase text-ink-400">
-                {profile?.role || "member"}
+                trader
               </div>
             </div>
-            <SignOutButton />
           </div>
         </div>
       </aside>
