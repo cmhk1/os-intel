@@ -160,13 +160,6 @@ const STATUS_LABEL: Record<string, string> = {
   delayed: "delayed",
 };
 
-const STATUS_COLOR: Record<string, string> = {
-  in_transit: "#f5a524",
-  loading: "#3b82f6",
-  arriving: "#10b981",
-  delayed: "#ef4444",
-};
-
 export default function MapPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
@@ -175,7 +168,12 @@ export default function MapPage() {
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
-    mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN!;
+    const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+    if (!token) {
+      console.error("NEXT_PUBLIC_MAPBOX_TOKEN is not set");
+      return;
+    }
+    mapboxgl.accessToken = token;
 
     const map = new mapboxgl.Map({
       container: containerRef.current,
@@ -189,47 +187,83 @@ export default function MapPage() {
 
     mapRef.current = map;
 
-    // Force resize after layout settles
+    map.addControl(new mapboxgl.AttributionControl({ compact: true }), "bottom-right");
+
     setTimeout(() => map.resize(), 100);
 
     map.on("load", () => {
       map.resize();
 
-      // Atmosphere — gives the globe its depth and glow
-      try {
-        (map as any).setFog({
-          color: "rgba(10,10,10,0.5)",
-          "high-color": "#000a14",
-          "horizon-blend": 0.06,
-          "space-color": "#000000",
-          "star-intensity": 0.45,
-        });
-      } catch {}
+      // Mapbox native fog — atmosphere around the globe
+      map.setFog({
+        color: "rgb(10, 10, 16)",
+        "high-color": "rgb(0, 8, 20)",
+        "horizon-blend": 0.08,
+        "space-color": "rgb(0, 0, 0)",
+        "star-intensity": 0.5,
+      });
 
-      // Routes
-      const normalRoutes = VESSELS.filter((v) => !v.exception).map((v) => ({
-        type: "Feature" as const,
-        properties: {},
-        geometry: {
-          type: "LineString" as const,
-          coordinates: [[v.loadLon, v.loadLat], [v.lon, v.lat], [v.dischargeLon, v.dischargeLat]],
+      // Trade routes — normal
+      map.addSource("routes", {
+        type: "geojson",
+        data: {
+          type: "FeatureCollection",
+          features: VESSELS.filter((v) => !v.exception).map((v) => ({
+            type: "Feature",
+            properties: {},
+            geometry: {
+              type: "LineString",
+              coordinates: [
+                [v.loadLon, v.loadLat],
+                [v.lon, v.lat],
+                [v.dischargeLon, v.dischargeLat],
+              ],
+            },
+          })),
         },
-      }));
-
-      const exceptionRoutes = VESSELS.filter((v) => v.exception).map((v) => ({
-        type: "Feature" as const,
-        properties: {},
-        geometry: {
-          type: "LineString" as const,
-          coordinates: [[v.loadLon, v.loadLat], [v.lon, v.lat], [v.dischargeLon, v.dischargeLat]],
+      });
+      map.addLayer({
+        id: "routes",
+        type: "line",
+        source: "routes",
+        paint: {
+          "line-color": "#f5a524",
+          "line-width": 1,
+          "line-opacity": 0.4,
+          "line-dasharray": [2, 3],
         },
-      }));
+      });
 
-      map.addSource("routes", { type: "geojson", data: { type: "FeatureCollection", features: normalRoutes } });
-      map.addLayer({ id: "routes", type: "line", source: "routes", paint: { "line-color": "#f5a524", "line-width": 0.8, "line-opacity": 0.35, "line-dasharray": [2, 3] } as any });
-
-      map.addSource("routes-ex", { type: "geojson", data: { type: "FeatureCollection", features: exceptionRoutes } });
-      map.addLayer({ id: "routes-ex", type: "line", source: "routes-ex", paint: { "line-color": "#ef4444", "line-width": 1, "line-opacity": 0.55, "line-dasharray": [2, 2] } as any });
+      // Trade routes — exceptions
+      map.addSource("routes-ex", {
+        type: "geojson",
+        data: {
+          type: "FeatureCollection",
+          features: VESSELS.filter((v) => v.exception).map((v) => ({
+            type: "Feature",
+            properties: {},
+            geometry: {
+              type: "LineString",
+              coordinates: [
+                [v.loadLon, v.loadLat],
+                [v.lon, v.lat],
+                [v.dischargeLon, v.dischargeLat],
+              ],
+            },
+          })),
+        },
+      });
+      map.addLayer({
+        id: "routes-ex",
+        type: "line",
+        source: "routes-ex",
+        paint: {
+          "line-color": "#ef4444",
+          "line-width": 1.2,
+          "line-opacity": 0.65,
+          "line-dasharray": [2, 2],
+        },
+      });
 
       // Vessel markers
       VESSELS.forEach((vessel) => {
@@ -245,15 +279,17 @@ export default function MapPage() {
         });
 
         const popup = new mapboxgl.Popup({ offset: 14, closeButton: false, maxWidth: "240px" })
-          .setHTML(`<div style="background:#0f0f0f;border:1px solid #1f1f1f;padding:12px 14px;font-family:'JetBrains Mono',monospace;">
-            <div style="color:#f5a524;font-size:10px;text-transform:uppercase;letter-spacing:0.15em;margin-bottom:3px;">${vessel.name}</div>
-            <div style="color:#525252;font-size:10px;margin-bottom:8px;">IMO ${vessel.imo}</div>
-            <div style="color:#f5a524;font-size:10px;margin-bottom:6px;">${vessel.dealRef}</div>
-            <div style="color:#c4c4c4;font-size:11px;">${vessel.cargo}</div>
-            <div style="color:#525252;font-size:10px;margin-top:3px;">${vessel.loadPort} → ${vessel.dischargePort}</div>
-            <div style="color:#8a8a8a;font-size:10px;margin-top:6px;">ETA ${vessel.eta} · ${vessel.speed}kn</div>
-            ${isEx ? `<div style="color:#ef4444;font-size:10px;margin-top:6px;text-transform:uppercase;letter-spacing:0.1em;">⚠ ${vessel.exceptionType}</div>` : ""}
-          </div>`);
+          .setHTML(`
+            <div style="background:#0f0f0f;border:1px solid #1f1f1f;padding:12px 14px;font-family:'JetBrains Mono',monospace;">
+              <div style="color:#f5a524;font-size:10px;text-transform:uppercase;letter-spacing:0.15em;margin-bottom:3px;">${vessel.name}</div>
+              <div style="color:#525252;font-size:10px;margin-bottom:8px;">IMO ${vessel.imo}</div>
+              <div style="color:#f5a524;font-size:10px;margin-bottom:6px;">${vessel.dealRef}</div>
+              <div style="color:#c4c4c4;font-size:11px;">${vessel.cargo}</div>
+              <div style="color:#525252;font-size:10px;margin-top:3px;">${vessel.loadPort} → ${vessel.dischargePort}</div>
+              <div style="color:#8a8a8a;font-size:10px;margin-top:6px;">ETA ${vessel.eta} · ${vessel.speed}kn</div>
+              ${isEx ? `<div style="color:#ef4444;font-size:10px;margin-top:6px;text-transform:uppercase;letter-spacing:0.1em;">⚠ ${vessel.exceptionType}</div>` : ""}
+            </div>
+          `);
 
         el.addEventListener("click", (e) => {
           e.stopPropagation();
@@ -277,21 +313,31 @@ export default function MapPage() {
       <style>{`
         @keyframes vpulse {
           0%,100% { box-shadow: 0 0 0 0 rgba(245,165,36,0.5), 0 0 8px rgba(245,165,36,0.4); }
-          50% { box-shadow: 0 0 0 5px rgba(245,165,36,0), 0 0 14px rgba(245,165,36,0.6); }
+          50%      { box-shadow: 0 0 0 5px rgba(245,165,36,0), 0 0 14px rgba(245,165,36,0.6); }
         }
         @keyframes vcrit {
           0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.7), 0 0 10px rgba(239,68,68,0.5); }
-          40% { box-shadow: 0 0 0 7px rgba(239,68,68,0), 0 0 18px rgba(239,68,68,0.8); }
+          40%      { box-shadow: 0 0 0 7px rgba(239,68,68,0), 0 0 18px rgba(239,68,68,0.8); }
         }
-        .mapboxgl-popup-content { background:#0f0f0f !important; border:1px solid #1f1f1f !important; border-radius:0 !important; padding:0 !important; box-shadow:0 8px 32px rgba(0,0,0,0.9) !important; }
-        .mapboxgl-popup-tip { border-top-color:#0f0f0f !important; border-bottom-color:#0f0f0f !important; }
-        .mapboxgl-ctrl-logo, .mapboxgl-ctrl-attrib { display:none !important; }
-        .mapboxgl-ctrl-group { background:rgba(15,15,15,0.9) !important; border:1px solid rgba(31,31,31,0.8) !important; border-radius:0 !important; }
-        .mapboxgl-ctrl-group button { background:transparent !important; filter:invert(0.6); }
-        .mapboxgl-ctrl-group button:hover { background:rgba(245,165,36,0.1) !important; }
+        .mapboxgl-popup-content {
+          background: #0f0f0f !important;
+          border: 1px solid #1f1f1f !important;
+          border-radius: 0 !important;
+          padding: 0 !important;
+          box-shadow: 0 8px 32px rgba(0,0,0,0.9) !important;
+        }
+        .mapboxgl-popup-tip { border-top-color: #0f0f0f !important; border-bottom-color: #0f0f0f !important; }
+        .mapboxgl-ctrl-attrib { background: rgba(0,0,0,0.6) !important; font-size: 9px !important; }
+        .mapboxgl-ctrl-attrib a { color: #525252 !important; }
+        .mapboxgl-ctrl-group {
+          background: rgba(15,15,15,0.9) !important;
+          border: 1px solid rgba(31,31,31,0.8) !important;
+          border-radius: 0 !important;
+        }
+        .mapboxgl-ctrl-group button { background: transparent !important; filter: invert(0.6); }
+        .mapboxgl-ctrl-group button:hover { background: rgba(245,165,36,0.1) !important; }
       `}</style>
 
-      {/* Full-bleed container — map fills it, UI overlaid on top */}
       <div style={{ position: "relative", width: "100%", height: "calc(100vh - 56px)", overflow: "hidden" }}>
         <div ref={containerRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
 
@@ -304,7 +350,7 @@ export default function MapPage() {
           <h1 className="font-display text-3xl tracking-tight drop-shadow-lg">World book</h1>
         </div>
 
-        {/* Status badges — top right */}
+        {/* Status badges */}
         <div className="absolute top-5 right-6 z-20 flex items-center gap-4">
           {exceptions.length > 0 && (
             <div className="flex items-center gap-1.5 font-mono text-[10px] text-crimson uppercase tracking-wider bg-black/60 px-2.5 py-1 backdrop-blur-sm border border-crimson-muted/40">
@@ -321,7 +367,7 @@ export default function MapPage() {
         {/* Bottom fade */}
         <div className="absolute bottom-0 inset-x-0 h-36 bg-gradient-to-t from-black/90 to-transparent pointer-events-none z-10" />
 
-        {/* KPI strip — bottom */}
+        {/* KPI strip */}
         <div className="absolute bottom-6 left-6 right-6 z-20 grid grid-cols-3 gap-px bg-ink-600/40 border border-ink-600/40">
           {[
             { label: "Vessels at sea", value: `${VESSELS.filter(v => v.status === "in_transit").length}`, sub: "in transit", danger: false },
@@ -366,7 +412,11 @@ export default function MapPage() {
               <div>
                 <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-400 mb-3">Vessel</div>
                 <div className="space-y-2">
-                  {[["IMO", selected.imo], ["Speed", `${selected.speed}kn`], ["Status", STATUS_LABEL[selected.status] || selected.status]].map(([k, v]) => (
+                  {[
+                    ["IMO", selected.imo],
+                    ["Speed", `${selected.speed}kn`],
+                    ["Status", STATUS_LABEL[selected.status] || selected.status],
+                  ].map(([k, v]) => (
                     <div key={k} className="flex justify-between font-mono text-[11px]">
                       <span className="text-ink-400">{k}</span>
                       <span className="text-white">{v}</span>
@@ -402,7 +452,7 @@ export default function MapPage() {
                     { agent: "Vessel Agent", action: "Position confirmed", time: "4m ago" },
                     { agent: "Document Agent", action: "B/L matched to contract", time: "2h ago" },
                     { agent: "Compliance Agent", action: "Sanctions clear", time: "6h ago" },
-                    { agent: "Finance Agent", action: "LC open · $" + (selected.quantity.replace(/,/g, "").split(" ")[0] !== "65" ? "158.9M" : "51.2M"), time: "1d ago" },
+                    { agent: "Finance Agent", action: "LC open · $158.9M", time: "1d ago" },
                   ].map((item, i) => (
                     <div key={i} className="py-2.5 flex gap-2.5">
                       <div className="w-1 h-1 rounded-full bg-ink-500 mt-1.5 shrink-0" />
