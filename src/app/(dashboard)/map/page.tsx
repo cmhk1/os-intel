@@ -286,40 +286,44 @@ export default function MapPage() {
         .maplibregl-ctrl-group button:hover { background:rgba(245,165,36,0.1) !important; }
       `}</style>
 
-      <div className="flex flex-col" style={{ height: "calc(100vh - 56px)" }}>
+      {/* Full-bleed container — map fills it, UI overlaid on top */}
+      <div className="relative w-full overflow-hidden" style={{ height: "calc(100vh - 56px)" }}>
+        <div ref={containerRef} className="absolute inset-0" />
+
+        {/* Top fade */}
+        <div className="absolute top-0 inset-x-0 h-28 bg-gradient-to-b from-black/75 to-transparent pointer-events-none z-10" />
+
         {/* Header */}
-        <div className="px-8 pt-5 pb-4 flex items-center justify-between shrink-0">
-          <div>
-            <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-amber mb-1">/ MAP — LIVE</div>
-            <h1 className="font-display text-3xl tracking-tight">World book</h1>
-          </div>
-          <div className="flex items-center gap-4">
-            {exceptions.length > 0 && (
-              <div className="flex items-center gap-1.5 font-mono text-[10px] text-crimson uppercase tracking-wider">
-                <span className="w-1.5 h-1.5 rounded-full bg-crimson animate-pulse" />
-                {exceptions.length} exception{exceptions.length > 1 ? "s" : ""}
-              </div>
-            )}
-            <div className="flex items-center gap-1.5 font-mono text-[10px] text-ink-400">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald animate-pulse" />
-              {VESSELS.length} vessels · 4s ago
+        <div className="absolute top-5 left-6 z-20">
+          <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-amber mb-1">/ MAP — LIVE</div>
+          <h1 className="font-display text-3xl tracking-tight drop-shadow-lg">World book</h1>
+        </div>
+
+        {/* Status badges — top right */}
+        <div className="absolute top-5 right-6 z-20 flex items-center gap-4">
+          {exceptions.length > 0 && (
+            <div className="flex items-center gap-1.5 font-mono text-[10px] text-crimson uppercase tracking-wider bg-black/60 px-2.5 py-1 backdrop-blur-sm border border-crimson-muted/40">
+              <span className="w-1.5 h-1.5 rounded-full bg-crimson animate-pulse" />
+              {exceptions.length} exception{exceptions.length > 1 ? "s" : ""}
             </div>
+          )}
+          <div className="flex items-center gap-1.5 font-mono text-[10px] text-ink-300 bg-black/60 px-2.5 py-1 backdrop-blur-sm">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald animate-pulse" />
+            {VESSELS.length} vessels · 4s ago
           </div>
         </div>
 
-        {/* Globe */}
-        <div className="relative flex-1 mx-8 border border-ink-600/60 overflow-hidden">
-          <div ref={containerRef} className="absolute inset-0" />
-        </div>
+        {/* Bottom fade */}
+        <div className="absolute bottom-0 inset-x-0 h-36 bg-gradient-to-t from-black/90 to-transparent pointer-events-none z-10" />
 
-        {/* KPI strip */}
-        <div className="mx-8 mb-6 mt-0 grid grid-cols-3 gap-px bg-ink-600/60 border border-ink-600/60 shrink-0">
+        {/* KPI strip — bottom */}
+        <div className="absolute bottom-6 left-6 right-6 z-20 grid grid-cols-3 gap-px bg-ink-600/40 border border-ink-600/40">
           {[
-            { label: "Vessels at sea", value: `${VESSELS.filter(v => v.status === "in_transit").length}`, sub: "in transit", accent: true },
-            { label: "Notional", value: "$1.2B", sub: "gross at sea", accent: true },
+            { label: "Vessels at sea", value: `${VESSELS.filter(v => v.status === "in_transit").length}`, sub: "in transit", danger: false },
+            { label: "Notional", value: "$1.2B", sub: "gross at sea", danger: false },
             { label: "Exceptions", value: `${exceptions.length}`, sub: "needs action", danger: exceptions.length > 0 },
           ].map((k) => (
-            <div key={k.label} className="bg-ink px-6 py-4">
+            <div key={k.label} className="bg-black/70 backdrop-blur-sm px-6 py-4">
               <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-400 mb-2">{k.label}</div>
               <div className={cn("font-display text-3xl text-tabular", k.danger ? "text-crimson" : "text-amber")}>{k.value}</div>
               <div className="font-mono text-[10px] text-ink-500 uppercase tracking-wider mt-1">{k.sub}</div>
