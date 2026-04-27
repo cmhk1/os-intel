@@ -366,6 +366,64 @@ export default function MapPage() {
     return () => clearInterval(id);
   }, []);
 
+  // Listen for vessels added via Cmd+K search
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const vessel = (e as CustomEvent).detail as {
+        id: string; mmsi: string; name: string;
+        last_position_lat: number; last_position_lon: number;
+        last_speed: number; last_heading: number; last_status: string;
+      };
+      if (!mapRef.current) return;
+
+      const newVessel: VesselDisplay = {
+        id: vessel.id,
+        name: vessel.name,
+        imo: vessel.mmsi,
+        dealRef: "—",
+        cargo: "—",
+        quantity: "—",
+        buyer: "—",
+        seller: "—",
+        loadPort: "—",
+        dischargePort: "—",
+        lat: vessel.last_position_lat,
+        lon: vessel.last_position_lon,
+        heading: vessel.last_heading ?? 0,
+        speed: String(vessel.last_speed ?? 0),
+        eta: "—",
+        status: (vessel.last_status ?? "in_transit").toLowerCase().replace(/ /g, "_"),
+        exception: false,
+        loadLat: vessel.last_position_lat,
+        loadLon: vessel.last_position_lon,
+        dischargeLat: vessel.last_position_lat,
+        dischargeLon: vessel.last_position_lon,
+        live: true,
+      };
+
+      const color = vesselColor(newVessel.status, false);
+      const el = makeMarkerEl(color, newVessel.heading, false);
+      const svg = el.querySelector("svg") as SVGSVGElement;
+      el.addEventListener("click", (ev) => { ev.stopPropagation(); setSelected(newVessel); });
+      const marker = new maplibregl.Marker({ element: el })
+        .setLngLat([newVessel.lon, newVessel.lat])
+        .addTo(mapRef.current);
+      markersRef.current.set(newVessel.id, { marker, svg });
+
+      setVessels((prev) => {
+        const exists = prev.find((v) => v.id === newVessel.id);
+        return exists ? prev.map((v) => v.id === newVessel.id ? newVessel : v) : [...prev, newVessel];
+      });
+
+      mapRef.current.flyTo({ center: [newVessel.lon, newVessel.lat], zoom: 5, duration: 1500 });
+      setSelected(newVessel);
+      setLastUpdated(new Date());
+    };
+
+    window.addEventListener("os:vessel-found", handler);
+    return () => window.removeEventListener("os:vessel-found", handler);
+  }, []); // intentionally empty deps — uses refs not state
+
   const exceptions = vessels.filter((v) => v.exception);
   const liveCount = vessels.filter((v) => v.live).length;
 
