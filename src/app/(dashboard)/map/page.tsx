@@ -177,7 +177,7 @@ export default function MapPage() {
 
     const map = new mapboxgl.Map({
       container: containerRef.current,
-      style: "mapbox://styles/mapbox/satellite-streets-v12",
+      style: "mapbox://styles/mapbox/dark-v11",
       center: [52, 22],
       zoom: 1.6,
       pitch: 25,
@@ -222,27 +222,15 @@ export default function MapPage() {
           })),
         },
       });
-      // Glow pass — wide soft line behind the route
-      map.addLayer({
-        id: "routes-glow",
-        type: "line",
-        source: "routes",
-        paint: {
-          "line-color": "#f5a524",
-          "line-width": 6,
-          "line-opacity": 0.12,
-          "line-blur": 4,
-        },
-      });
       map.addLayer({
         id: "routes",
         type: "line",
         source: "routes",
         paint: {
           "line-color": "#f5a524",
-          "line-width": 1.5,
-          "line-opacity": 0.7,
-          "line-dasharray": [3, 3],
+          "line-width": 1,
+          "line-opacity": 0.4,
+          "line-dasharray": [2, 3],
         },
       });
 
@@ -266,24 +254,13 @@ export default function MapPage() {
         },
       });
       map.addLayer({
-        id: "routes-ex-glow",
-        type: "line",
-        source: "routes-ex",
-        paint: {
-          "line-color": "#ef4444",
-          "line-width": 8,
-          "line-opacity": 0.15,
-          "line-blur": 4,
-        },
-      });
-      map.addLayer({
         id: "routes-ex",
         type: "line",
         source: "routes-ex",
         paint: {
           "line-color": "#ef4444",
-          "line-width": 1.8,
-          "line-opacity": 0.85,
+          "line-width": 1.2,
+          "line-opacity": 0.65,
           "line-dasharray": [2, 2],
         },
       });
@@ -293,11 +270,10 @@ export default function MapPage() {
         const el = document.createElement("div");
         const isEx = vessel.exception;
         Object.assign(el.style, {
-          width: "12px",
-          height: "12px",
+          width: "10px",
+          height: "10px",
           borderRadius: "50%",
           background: isEx ? "#ef4444" : "#f5a524",
-          border: isEx ? "2px solid rgba(239,68,68,0.6)" : "2px solid rgba(245,165,36,0.6)",
           cursor: "pointer",
           animation: isEx ? "vcrit 0.9s ease-in-out infinite" : "vpulse 2s ease-in-out infinite",
         });
