@@ -3,12 +3,12 @@
  *
  * Called every 5 minutes by GitHub Actions.
  * Connects to AISStream WebSocket, subscribes to all tracked vessel MMSIs,
- * collects position reports for up to 15 seconds, then upserts into the DB.
+ * collects position reports for up to 20 seconds, then upserts into the DB.
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const LISTEN_MS = 15_000;
+const LISTEN_MS = 20_000;
 
 const NAV_STATUS: Record<number, string> = {
   0: "Under way using engine",
