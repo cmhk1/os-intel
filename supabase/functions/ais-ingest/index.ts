@@ -63,17 +63,27 @@ Deno.serve(async (req) => {
     } catch { /* no body or not JSON — fall through to full cron mode */ }
   }
 
-  // Fetch MMSIs to track: either the single requested one, or all vessels in DB
-  const query = supabase.from("vessels").select("id, mmsi, name").not("mmsi", "is", null);
-  if (singleMmsi) query.eq("mmsi", singleMmsi);
-  const { data: tracked, error: fetchErr } = await query;
+  // Fetch vessels from DB. In single-MMSI mode the vessel may not exist yet —
+  // that's fine, we go to AISStream anyway and upsert after getting the fix.
+  const { data: tracked, error: fetchErr } = await supabase
+    .from("vessels")
+    .select("id, mmsi, name")
+    .not("mmsi", "is", null);
 
-  if (fetchErr || !tracked?.length) {
-    return json({ ok: false, error: fetchErr?.message ?? "No vessels with MMSI found" }, 500);
+  if (fetchErr) {
+    return json({ ok: false, error: fetchErr.message }, 500);
   }
 
-  const mmsiList   = tracked.map((v) => v.mmsi as string);
-  const byMmsi     = Object.fromEntries(tracked.map((v) => [v.mmsi, v]));
+  // Cron mode needs at least one vessel in the DB to know what to track.
+  if (!singleMmsi && !tracked?.length) {
+    return json({ ok: true, tracked: 0, updated: 0, message: "No vessels with MMSI in DB" });
+  }
+
+  // Build lookup structures — single-MMSI mode uses just that MMSI even if new.
+  const mmsiList = singleMmsi
+    ? [singleMmsi]
+    : (tracked ?? []).map((v) => v.mmsi as string);
+  const byMmsi   = Object.fromEntries((tracked ?? []).map((v) => [v.mmsi, v]));
   const fixes      = new Map<string, PositionFix>();
 
   // ── AISStream WebSocket ────────────────────────────────────────────────────
