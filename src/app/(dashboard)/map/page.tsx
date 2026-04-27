@@ -170,9 +170,11 @@ const STATIC: Omit<VesselDisplay, "live">[] = [
 const STATUS_COLOR: Record<string, string> = {
   in_transit: "#f5a524",
   "under way using engine": "#f5a524",
+  "under way sailing": "#f5a524",
   loading: "#3b82f6",
   arriving: "#10b981",
   moored: "#6b7280",
+  "at anchor": "#6b7280",
   delayed: "#ef4444",
 };
 
@@ -188,42 +190,65 @@ function relativeTime(date: Date): string {
   return `${Math.floor(s / 3600)}h ago`;
 }
 
-// Circle + directional arrowhead, rotated to heading direction
-function makeMarkerEl(color: string, heading: number, exception: boolean): HTMLElement {
-  // 40x40 container with circle+arrowhead centred at (20,20) so MapLibre's
-  // anchor:"center" maps exactly to the vessel's lat/lon with no drift.
-  const wrap = document.createElement("div");
-  wrap.style.cssText = "position:relative;width:40px;height:40px;cursor:pointer;";
+// Build a white upward-pointing arrow on a transparent canvas for SDF icon use.
+// SDF (Signed Distance Field) lets MapLibre recolor the icon via icon-color.
+function buildArrowImageData(): { width: number; height: number; data: Uint8Array } {
+  const size = 24;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+  ctx.fillStyle = "white";
+  ctx.beginPath();
+  ctx.moveTo(12, 3);   // tip
+  ctx.lineTo(7, 20);   // bottom-left
+  ctx.lineTo(12, 16);  // inner notch
+  ctx.lineTo(17, 20);  // bottom-right
+  ctx.closePath();
+  ctx.fill();
+  const d = ctx.getImageData(0, 0, size, size);
+  return { width: size, height: size, data: new Uint8Array(d.data.buffer) };
+}
 
-  const glow = document.createElement("div");
-  glow.className = exception ? "vex-glow" : "vnorm-glow";
-  glow.style.cssText = `position:absolute;inset:0;border-radius:50%;background:${color};opacity:0.18;pointer-events:none;`;
-  wrap.appendChild(glow);
-
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("viewBox", "0 0 40 40");
-  svg.setAttribute("width", "40");
-  svg.setAttribute("height", "40");
-  svg.style.cssText = `position:absolute;inset:0;transform:rotate(${heading}deg);transform-origin:20px 20px;`;
-  svg.innerHTML = `
-    <circle cx="20" cy="20" r="5" fill="${color}" stroke="rgba(0,0,0,0.55)" stroke-width="1.5"/>
-    <polygon points="20,9 17,16 23,16" fill="${color}" opacity="0.85"/>
-  `;
-  wrap.appendChild(svg);
-  return wrap;
+// Convert the vessel list to a GeoJSON FeatureCollection for the map source.
+function toGeoJSON(list: VesselDisplay[]) {
+  return {
+    type: "FeatureCollection" as const,
+    features: list.map((v) => ({
+      type: "Feature" as const,
+      properties: {
+        id: v.id,
+        color: vesselColor(v.status, v.exception),
+        heading: v.heading,
+      },
+      geometry: { type: "Point" as const, coordinates: [v.lon, v.lat] },
+    })),
+  };
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function MapPage() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<maplibregl.Map | null>(null);
-  const markersRef = useRef<Map<string, { marker: maplibregl.Marker; svg: SVGSVGElement }>>(new Map());
+  const mapRef       = useRef<maplibregl.Map | null>(null);
+  // Stable ref so click handlers always see the latest vessel list without stale closures.
+  const vesselsRef   = useRef<VesselDisplay[]>([]);
 
-  const [vessels, setVessels] = useState<VesselDisplay[]>([]);
-  const [selected, setSelected] = useState<VesselDisplay | null>(null);
+  const [vessels, setVessels]         = useState<VesselDisplay[]>([]);
+  const [selected, setSelected]       = useState<VesselDisplay | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [, setTick] = useState(0);
+  const [, setTick]                   = useState(0);
+
+  // Keep ref in sync with state on every render.
+  useEffect(() => { vesselsRef.current = vessels; }, [vessels]);
+
+  // Whenever the vessel list changes, push the updated GeoJSON into the map source.
+  // This single effect replaces all per-operation marker manipulation.
+  useEffect(() => {
+    const src = mapRef.current?.getSource("vessels-src") as maplibregl.GeoJSONSource | undefined;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    src?.setData(toGeoJSON(vessels) as any);
+  }, [vessels]);
 
   const mergeWithLive = useCallback((rows: Record<string, unknown>[]): VesselDisplay[] => {
     const merged = STATIC.map((s) => ({ ...s, live: false }));
@@ -246,33 +271,6 @@ export default function MapPage() {
     return merged;
   }, []);
 
-  const patchMarker = useCallback((id: string, lat: number, lon: number, heading: number, color: string) => {
-    const entry = markersRef.current.get(id);
-    if (!entry) return;
-    entry.marker.setLngLat([lon, lat]);
-    entry.svg.style.transform = `rotate(${heading}deg)`;
-    entry.svg.querySelectorAll("circle,polygon").forEach((el) => el.setAttribute("fill", color));
-  }, []);
-
-  const buildMarkers = useCallback((map: maplibregl.Map, list: VesselDisplay[], onSelect: (v: VesselDisplay) => void) => {
-    markersRef.current.forEach(({ marker }) => marker.remove());
-    markersRef.current.clear();
-
-    list.forEach((v) => {
-      const color = vesselColor(v.status, v.exception);
-      const el = makeMarkerEl(color, v.heading, v.exception);
-      const svg = el.querySelector("svg") as SVGSVGElement;
-
-      el.addEventListener("click", (e) => { e.stopPropagation(); onSelect(v); });
-
-      const marker = new maplibregl.Marker({ element: el, anchor: "center" })
-        .setLngLat([v.lon, v.lat])
-        .addTo(map);
-
-      markersRef.current.set(v.id, { marker, svg });
-    });
-  }, []);
-
   // ── Map init + data ───────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -281,8 +279,8 @@ export default function MapPage() {
     const map = new maplibregl.Map({
       container: containerRef.current,
       style: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
-      center: [52, 22],
-      zoom: 1.6,
+      center: [20, 20],
+      zoom: 1.8,
       pitch: 0,
       attributionControl: false,
     });
@@ -321,13 +319,83 @@ export default function MapPage() {
         }));
 
       map.addSource("routes", { type: "geojson", data: { type: "FeatureCollection", features: routeFeatures(false) } });
-      map.addLayer({ id: "routes", type: "line", source: "routes", paint: { "line-color": "#f5a524", "line-width": 0.8, "line-opacity": 0.28, "line-dasharray": [2, 3] } as maplibregl.LinePaint });
+      map.addLayer({ id: "routes", type: "line", source: "routes", paint: { "line-color": "#f5a524", "line-width": 0.8, "line-opacity": 0.28, "line-dasharray": [2, 3] } });
       map.addSource("routes-ex", { type: "geojson", data: { type: "FeatureCollection", features: routeFeatures(true) } });
-      map.addLayer({ id: "routes-ex", type: "line", source: "routes-ex", paint: { "line-color": "#ef4444", "line-width": 1, "line-opacity": 0.5, "line-dasharray": [2, 2] } as maplibregl.LinePaint });
+      map.addLayer({ id: "routes-ex", type: "line", source: "routes-ex", paint: { "line-color": "#ef4444", "line-width": 1, "line-opacity": 0.5, "line-dasharray": [2, 2] } });
 
-      buildMarkers(map, list, setSelected);
+      // ── Vessel layers (GeoJSON-based, GPU-rendered — no DOM markers) ──────
+      // Using native layers instead of maplibregl.Marker ensures correct
+      // placement on the globe at all zoom levels with no drift.
 
-      // Realtime: patch individual markers when AIS ingest updates a vessel
+      map.addImage("vessel-arrow", buildArrowImageData(), { sdf: true });
+      map.addSource("vessels-src", {
+        type: "geojson",
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        data: toGeoJSON(list) as any,
+      });
+
+      // Soft glow behind each dot
+      map.addLayer({
+        id: "vessel-glow",
+        type: "circle",
+        source: "vessels-src",
+        paint: {
+          "circle-radius": 14,
+          "circle-color": ["get", "color"],
+          "circle-opacity": 0.12,
+          "circle-blur": 0.8,
+        },
+      });
+
+      // Primary dot at exact position
+      map.addLayer({
+        id: "vessel-dots",
+        type: "circle",
+        source: "vessels-src",
+        paint: {
+          "circle-radius": 5,
+          "circle-color": ["get", "color"],
+          "circle-stroke-width": 1.5,
+          "circle-stroke-color": "rgba(0,0,0,0.6)",
+        },
+      });
+
+      // Directional arrow above/beside the dot, rotated by heading
+      map.addLayer({
+        id: "vessel-arrows",
+        type: "symbol",
+        source: "vessels-src",
+        layout: {
+          "icon-image": "vessel-arrow",
+          "icon-size": 0.85,
+          "icon-rotate": ["get", "heading"],
+          "icon-rotation-alignment": "map",
+          "icon-allow-overlap": true,
+          "icon-ignore-placement": true,
+          "icon-anchor": "bottom",
+          "icon-offset": [0, -7],
+        },
+        paint: {
+          "icon-color": ["get", "color"],
+          "icon-opacity": 0.9,
+        },
+      });
+
+      // Click: look up the vessel from the stable ref to avoid stale closure
+      const onVesselClick = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
+        const id = e.features?.[0]?.properties?.id as string | undefined;
+        if (!id) return;
+        const v = vesselsRef.current.find((x) => x.id === id);
+        if (v) setSelected(v);
+      };
+      map.on("click", "vessel-dots",   onVesselClick);
+      map.on("click", "vessel-arrows", onVesselClick);
+      map.on("mouseenter", "vessel-dots",   () => { map.getCanvas().style.cursor = "pointer"; });
+      map.on("mouseleave", "vessel-dots",   () => { map.getCanvas().style.cursor = ""; });
+      map.on("mouseenter", "vessel-arrows", () => { map.getCanvas().style.cursor = "pointer"; });
+      map.on("mouseleave", "vessel-arrows", () => { map.getCanvas().style.cursor = ""; });
+
+      // Realtime subscription
       const channel = supabase
         .channel("live-vessels")
         .on("postgres_changes", { event: "UPDATE", schema: "public", table: "vessels" }, (payload) => {
@@ -339,17 +407,21 @@ export default function MapPage() {
 
           const rawStatus = String(row.last_status ?? "").toLowerCase().replace(/ /g, "_");
           const isException = Number(row.ais_gaps_24h) > 0;
-          const color = vesselColor(rawStatus, isException);
-          const newLat = Number(row.last_position_lat);
-          const newLon = Number(row.last_position_lon);
-          const newHeading = Number(row.last_heading) || 0;
-
-          patchMarker(targetId, newLat, newLon, newHeading, color);
 
           setVessels((prev) =>
             prev.map((v) =>
               v.id === targetId
-                ? { ...v, lat: newLat, lon: newLon, heading: newHeading, speed: String(row.last_speed ?? v.speed), status: rawStatus || v.status, exception: isException, exceptionType: isException ? `AIS gap · ${row.ais_gaps_24h} gaps in 24h` : undefined, live: true }
+                ? {
+                    ...v,
+                    lat: Number(row.last_position_lat) || v.lat,
+                    lon: Number(row.last_position_lon) || v.lon,
+                    heading: Number(row.last_heading) || v.heading,
+                    speed: String(row.last_speed ?? v.speed),
+                    status: rawStatus || v.status,
+                    exception: isException,
+                    exceptionType: isException ? `AIS gap · ${row.ais_gaps_24h} gaps in 24h` : undefined,
+                    live: true,
+                  }
                 : v
             )
           );
@@ -358,8 +430,6 @@ export default function MapPage() {
         .on("postgres_changes", { event: "DELETE", schema: "public", table: "vessels" }, (payload) => {
           const deletedId = String((payload.old as Record<string, unknown>).id ?? "");
           if (!deletedId) return;
-          const entry = markersRef.current.get(deletedId);
-          if (entry) { entry.marker.remove(); markersRef.current.delete(deletedId); }
           setVessels((prev) => prev.filter((v) => v.id !== deletedId));
           setSelected((prev) => (prev?.id === deletedId ? null : prev));
         })
@@ -369,7 +439,7 @@ export default function MapPage() {
     });
 
     return () => { map.remove(); mapRef.current = null; };
-  }, [buildMarkers, mergeWithLive, patchMarker]);
+  }, [mergeWithLive]);
 
   // Keep relative timestamps fresh every 30s
   useEffect(() => {
@@ -412,18 +482,11 @@ export default function MapPage() {
         live: true,
       };
 
-      const color = vesselColor(newVessel.status, false);
-      const el = makeMarkerEl(color, newVessel.heading, false);
-      const svg = el.querySelector("svg") as SVGSVGElement;
-      el.addEventListener("click", (ev) => { ev.stopPropagation(); setSelected(newVessel); });
-      const marker = new maplibregl.Marker({ element: el, anchor: "center" })
-        .setLngLat([newVessel.lon, newVessel.lat])
-        .addTo(mapRef.current);
-      markersRef.current.set(newVessel.id, { marker, svg });
-
       setVessels((prev) => {
         const exists = prev.find((v) => v.id === newVessel.id);
-        return exists ? prev.map((v) => v.id === newVessel.id ? newVessel : v) : [...prev, newVessel];
+        return exists
+          ? prev.map((v) => (v.id === newVessel.id ? newVessel : v))
+          : [...prev, newVessel];
       });
 
       mapRef.current.flyTo({ center: [newVessel.lon, newVessel.lat], zoom: 5, duration: 1500 });
@@ -433,18 +496,14 @@ export default function MapPage() {
 
     window.addEventListener("os:vessel-found", handler);
     return () => window.removeEventListener("os:vessel-found", handler);
-  }, []); // intentionally empty deps — uses refs not state
+  }, []); // intentionally empty — uses refs not state
 
   const exceptions = vessels.filter((v) => v.exception);
-  const liveCount = vessels.filter((v) => v.live).length;
+  const liveCount  = vessels.filter((v) => v.live).length;
 
   return (
     <>
       <style>{`
-        @keyframes vnorm { 0%,100%{opacity:.18;transform:scale(1)} 50%{opacity:.06;transform:scale(1.7)} }
-        @keyframes vex   { 0%,100%{opacity:.28;transform:scale(1)} 40%{opacity:.1;transform:scale(1.9)} }
-        .vnorm-glow{animation:vnorm 2.6s ease-in-out infinite}
-        .vex-glow  {animation:vex   0.85s ease-in-out infinite}
         .maplibregl-popup-content{background:#0c0c0c!important;border:1px solid #222!important;border-radius:0!important;padding:0!important;box-shadow:0 12px 40px rgba(0,0,0,.95)!important}
         .maplibregl-popup-tip{border-top-color:#0c0c0c!important;border-bottom-color:#0c0c0c!important}
         .maplibregl-ctrl-logo,.maplibregl-ctrl-attrib{display:none!important}

@@ -8,20 +8,39 @@ import { createBrowserClient } from "@/lib/supabase/client";
 export function RemoveVesselButton({ id, name }: { id: string; name: string }) {
   const [confirming, setConfirming] = useState(false);
   const [loading, setLoading]       = useState(false);
+  const [error, setError]           = useState<string | null>(null);
   const router = useRouter();
 
   const handleClick = async () => {
-    if (!confirming) { setConfirming(true); return; }
+    if (!confirming) { setConfirming(true); setError(null); return; }
     setLoading(true);
     const supabase = createBrowserClient();
-    await supabase.rpc("delete_vessel", { p_id: id });
+    const { error: rpcErr } = await supabase.rpc("delete_vessel", { p_id: id });
+    if (rpcErr) {
+      setError(rpcErr.message);
+      setLoading(false);
+      setConfirming(false);
+      return;
+    }
     router.refresh();
   };
+
+  if (error) {
+    return (
+      <span
+        className="font-mono text-[10px] text-crimson cursor-pointer"
+        title={error}
+        onClick={() => setError(null)}
+      >
+        RPC error
+      </span>
+    );
+  }
 
   return (
     <button
       onClick={handleClick}
-      onBlur={() => setConfirming(false)}
+      onBlur={() => { if (!loading) setConfirming(false); }}
       disabled={loading}
       title={confirming ? `Click again to stop tracking ${name}` : `Stop tracking ${name}`}
       className={`flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider px-2 py-1 border transition-colors disabled:opacity-40 ${
