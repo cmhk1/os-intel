@@ -41,7 +41,7 @@ interface PositionFix {
   shipName: string | null;
 }
 
-Deno.serve(async () => {
+Deno.serve(async (req) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceKey  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const aisKey      = Deno.env.get("AISSTREAM_API_KEY");
@@ -52,11 +52,21 @@ Deno.serve(async () => {
 
   const supabase = createClient(supabaseUrl, serviceKey);
 
-  // Fetch all MMSIs currently in the vessels table
-  const { data: tracked, error: fetchErr } = await supabase
-    .from("vessels")
-    .select("id, mmsi, name")
-    .not("mmsi", "is", null);
+  // Optional single-MMSI lookup mode (called from /api/vessels/lookup via Next.js)
+  let singleMmsi: string | null = null;
+  if (req.method === "POST") {
+    try {
+      const body = await req.json();
+      if (body?.mmsi && /^\d{9}$/.test(String(body.mmsi))) {
+        singleMmsi = String(body.mmsi);
+      }
+    } catch { /* no body or not JSON — fall through to full cron mode */ }
+  }
+
+  // Fetch MMSIs to track: either the single requested one, or all vessels in DB
+  const query = supabase.from("vessels").select("id, mmsi, name").not("mmsi", "is", null);
+  if (singleMmsi) query.eq("mmsi", singleMmsi);
+  const { data: tracked, error: fetchErr } = await query;
 
   if (fetchErr || !tracked?.length) {
     return json({ ok: false, error: fetchErr?.message ?? "No vessels with MMSI found" }, 500);
@@ -124,6 +134,9 @@ Deno.serve(async () => {
   });
 
   if (!fixes.size) {
+    if (singleMmsi) {
+      return json({ error: "Vessel not responding — not currently broadcasting AIS" }, 404);
+    }
     return json({ ok: true, tracked: mmsiList.length, updated: 0, message: "No position reports received within window" });
   }
 
@@ -169,23 +182,44 @@ Deno.serve(async () => {
     })
   );
 
-  // Mark vessels that sent NO fix this cycle as potentially gapped
-  const missedMmsis = mmsiList.filter((m) => !fixes.has(m));
-  if (missedMmsis.length) {
-    await supabase
-      .from("vessels")
-      .update({ ais_gaps_24h: supabase.rpc("ais_gaps_24h_increment" as never) })
-      .in("mmsi", missedMmsis);
+  // Mark vessels that sent NO fix this cycle as potentially gapped (cron mode only)
+  if (!singleMmsi) {
+    const missedMmsis = mmsiList.filter((m) => !fixes.has(m));
+    if (missedMmsis.length) {
+      await supabase
+        .from("vessels")
+        .update({ ais_gaps_24h: supabase.rpc("ais_gaps_24h_increment" as never) })
+        .in("mmsi", missedMmsis);
+    }
+  }
+
+  // Single-MMSI lookup: upsert via RPC (handles new vessels not yet in the DB)
+  // and return the vessel row for the frontend.
+  if (singleMmsi) {
+    const fix = fixes.get(singleMmsi)!;
+    const { data, error: rpcErr } = await supabase.rpc("upsert_vessel_from_ais", {
+      p_mmsi:        singleMmsi,
+      p_name:        fix.shipName ?? `VESSEL ${singleMmsi}`,
+      p_lat:         fix.lat,
+      p_lon:         fix.lon,
+      p_speed:       fix.speed,
+      p_heading:     fix.heading,
+      p_status:      fix.status,
+      p_destination: fix.destination,
+      p_imo:         null,
+    });
+    if (rpcErr) return json({ error: rpcErr.message }, 500);
+    const vessel = Array.isArray(data) ? data[0] : data;
+    return json({ vessel });
   }
 
   return json({
-    ok:                 true,
-    timestamp:          now,
-    tracked:            mmsiList.length,
-    fixes_received:     fixes.size,
+    ok:             true,
+    timestamp:      now,
+    tracked:        mmsiList.length,
+    fixes_received: fixes.size,
     updated,
-    missed:             missedMmsis,
-    errors:             errors.length ? errors : undefined,
+    errors:         errors.length ? errors : undefined,
   });
 });
 
