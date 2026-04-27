@@ -3,17 +3,17 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { getSupabase } from "@/lib/supabase/client";
 
 export default function Home() {
   const router = useRouter();
 
   const [heroEmail, setHeroEmail] = useState("");
   const [heroError, setHeroError] = useState(false);
-  const [heroSubmitted, setHeroSubmitted] = useState(false);
+  const [heroSubmitting, setHeroSubmitting] = useState(false);
 
   const [contactSuccess, setContactSuccess] = useState(false);
   const [contactSubmitting, setContactSubmitting] = useState(false);
+  const [contactServerError, setContactServerError] = useState("");
   const [contactFields, setContactFields] = useState({ name: "", company: "", email: "", message: "" });
   const [contactErrors, setContactErrors] = useState<Record<string, boolean>>({});
 
@@ -23,9 +23,13 @@ export default function Home() {
     const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
     if (!valid) { setHeroError(true); return; }
     setHeroError(false);
-    setHeroSubmitted(true);
-    // Save to waitlist (ignore duplicate emails)
-    await getSupabase().from("waitlist").insert([{ email }]);
+    setHeroSubmitting(true);
+    await fetch("/api/waitlist", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    // Redirect regardless — email saved best-effort
     router.push("/dashboard");
   }
 
@@ -41,19 +45,24 @@ export default function Home() {
     if (!valid) return;
 
     setContactSubmitting(true);
-    const { error } = await getSupabase().from("contact_submissions").insert([{
-      name: contactFields.name.trim(),
-      company: contactFields.company.trim(),
-      email: contactFields.email.trim(),
-      message: contactFields.message.trim(),
-    }]);
-    setContactSubmitting(false);
-
-    if (error) {
-      console.error("Contact form error:", error.message);
-      return;
+    setContactServerError("");
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(contactFields),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setContactServerError(data.error || "Something went wrong. Please try again.");
+        return;
+      }
+      setContactSuccess(true);
+    } catch {
+      setContactServerError("Network error. Please try again.");
+    } finally {
+      setContactSubmitting(false);
     }
-    setContactSuccess(true);
   }
 
   return (
@@ -95,14 +104,14 @@ export default function Home() {
               onChange={(e) => { setHeroEmail(e.target.value); setHeroError(false); }}
               style={{ flex: 1, background: "transparent", border: 0, outline: "none", color: heroError ? "#ff7b6b" : "#f1ece4", fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 14, padding: "10px 8px" }}
             />
-            <button type="submit" style={{ display: "inline-flex", alignItems: "center", gap: 10, padding: "12px 20px", border: "1px solid #f5a623", background: "#f5a623", color: "#1a0f00", fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
-              Open terminal ↗
+            <button type="submit" disabled={heroSubmitting} style={{ display: "inline-flex", alignItems: "center", gap: 10, padding: "12px 20px", border: "1px solid #f5a623", background: "#f5a623", color: "#1a0f00", fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 14, fontWeight: 500, cursor: heroSubmitting ? "not-allowed" : "pointer", opacity: heroSubmitting ? 0.7 : 1 }}>
+              {heroSubmitting ? "Opening…" : "Open terminal ↗"}
             </button>
           </div>
         </form>
 
         <div style={{ marginTop: 14, fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, letterSpacing: "0.4px" }}>
-          {heroSubmitted
+          {heroSubmitting
             ? <span style={{ color: "#f5a623" }}>✓ Opening terminal…</span>
             : heroError
             ? <span style={{ color: "#ff7b6b" }}>Enter a valid email address</span>
@@ -177,14 +186,19 @@ export default function Home() {
                   />
                 </div>
 
-                <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 8, paddingTop: 24, borderTop: "1px solid #221f1c" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 8, paddingTop: 24, borderTop: "1px solid #221f1c" }}>
                   <button
                     type="submit"
                     disabled={contactSubmitting}
-                    style={{ display: "inline-flex", alignItems: "center", gap: 10, padding: "12px 20px", border: "1px solid #f5a623", background: "#f5a623", color: "#1a0f00", fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 14, fontWeight: 500, cursor: contactSubmitting ? "not-allowed" : "pointer", opacity: contactSubmitting ? 0.7 : 1 }}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 10, padding: "12px 20px", border: "1px solid #f5a623", background: "#f5a623", color: "#1a0f00", fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 14, fontWeight: 500, cursor: contactSubmitting ? "not-allowed" : "pointer", opacity: contactSubmitting ? 0.7 : 1, alignSelf: "flex-start" }}
                   >
                     {contactSubmitting ? "Sending…" : "Send message ↗"}
                   </button>
+                  {contactServerError && (
+                    <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, color: "#ff7b6b", letterSpacing: "0.4px" }}>
+                      ✕ {contactServerError}
+                    </span>
+                  )}
                 </div>
               </form>
             ) : (
