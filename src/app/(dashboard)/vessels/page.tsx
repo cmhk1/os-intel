@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { cn } from "@/lib/utils";
 import { relativeTime } from "@/lib/utils";
+import { RemoveVesselButton } from "@/components/RemoveVesselButton";
 
 export const dynamic = "force-dynamic";
 
@@ -127,11 +128,11 @@ export default async function VesselsPage() {
       ) : (
         <div className="border border-ink-600/30">
           {/* Column headers */}
-          <div className="grid grid-cols-[20px_1fr_140px_80px_160px_110px] gap-4 px-5 py-2.5 border-b border-ink-600/40 bg-ink-800/40">
-            {["", "Vessel", "Type / Flag", "Speed", "Destination", "Last seen"].map(
-              (col) => (
+          <div className="grid grid-cols-[20px_1fr_140px_80px_160px_110px_90px] gap-4 px-5 py-2.5 border-b border-ink-600/40 bg-ink-800/40">
+            {["", "Vessel", "Type / Flag", "Speed", "Destination", "Last seen", ""].map(
+              (col, i) => (
                 <div
-                  key={col}
+                  key={i}
                   className="font-mono text-[10px] uppercase tracking-wider text-ink-400"
                 >
                   {col}
@@ -144,7 +145,7 @@ export default async function VesselsPage() {
           {vessels.map((v) => (
             <div
               key={v.id}
-              className="grid grid-cols-[20px_1fr_140px_80px_160px_110px] gap-4 items-center px-5 py-3 border-b border-ink-600/40 hover:bg-ink-700/20 transition-colors"
+              className="grid grid-cols-[20px_1fr_140px_80px_160px_110px_90px] gap-4 items-center px-5 py-3 border-b border-ink-600/40 hover:bg-ink-700/20 transition-colors"
             >
               {/* Status dot */}
               <div className="flex items-center justify-center">
@@ -196,6 +197,11 @@ export default async function VesselsPage() {
               {/* Last seen */}
               <div className="font-mono text-[11px] text-ink-400">
                 {v.last_position_at ? relativeTime(v.last_position_at) : "—"}
+              </div>
+
+              {/* Remove */}
+              <div className="flex justify-end">
+                <RemoveVesselButton id={v.id} name={v.name ?? v.mmsi ?? "vessel"} />
               </div>
             </div>
           ))}

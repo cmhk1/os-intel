@@ -190,23 +190,24 @@ function relativeTime(date: Date): string {
 
 // Circle + directional arrowhead, rotated to heading direction
 function makeMarkerEl(color: string, heading: number, exception: boolean): HTMLElement {
+  // 40x40 container with circle+arrowhead centred at (20,20) so MapLibre's
+  // anchor:"center" maps exactly to the vessel's lat/lon with no drift.
   const wrap = document.createElement("div");
-  wrap.style.cssText = "position:relative;width:28px;height:28px;cursor:pointer;";
+  wrap.style.cssText = "position:relative;width:40px;height:40px;cursor:pointer;";
 
   const glow = document.createElement("div");
   glow.className = exception ? "vex-glow" : "vnorm-glow";
-  glow.style.cssText = `position:absolute;inset:-6px;border-radius:50%;background:${color};opacity:0.18;pointer-events:none;`;
+  glow.style.cssText = `position:absolute;inset:0;border-radius:50%;background:${color};opacity:0.18;pointer-events:none;`;
   wrap.appendChild(glow);
 
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("viewBox", "0 0 28 28");
-  svg.setAttribute("width", "28");
-  svg.setAttribute("height", "28");
-  svg.style.cssText = `position:absolute;inset:0;transform:rotate(${heading}deg);transform-origin:14px 14px;overflow:visible;`;
-  // Circle centred at (14,14), arrowhead pointing north (up = 0°), rotated by heading
+  svg.setAttribute("viewBox", "0 0 40 40");
+  svg.setAttribute("width", "40");
+  svg.setAttribute("height", "40");
+  svg.style.cssText = `position:absolute;inset:0;transform:rotate(${heading}deg);transform-origin:20px 20px;`;
   svg.innerHTML = `
-    <circle cx="14" cy="14" r="5" fill="${color}" stroke="rgba(0,0,0,0.55)" stroke-width="1.5"/>
-    <polygon points="14,3 11,10 17,10" fill="${color}" opacity="0.85"/>
+    <circle cx="20" cy="20" r="5" fill="${color}" stroke="rgba(0,0,0,0.55)" stroke-width="1.5"/>
+    <polygon points="20,9 17,16 23,16" fill="${color}" opacity="0.85"/>
   `;
   wrap.appendChild(svg);
   return wrap;
@@ -264,7 +265,7 @@ export default function MapPage() {
 
       el.addEventListener("click", (e) => { e.stopPropagation(); onSelect(v); });
 
-      const marker = new maplibregl.Marker({ element: el })
+      const marker = new maplibregl.Marker({ element: el, anchor: "center" })
         .setLngLat([v.lon, v.lat])
         .addTo(map);
 
@@ -282,7 +283,7 @@ export default function MapPage() {
       style: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
       center: [52, 22],
       zoom: 1.6,
-      pitch: 25,
+      pitch: 0,
       attributionControl: false,
     });
     mapRef.current = map;
@@ -331,8 +332,10 @@ export default function MapPage() {
         .channel("live-vessels")
         .on("postgres_changes", { event: "UPDATE", schema: "public", table: "vessels" }, (payload) => {
           const row = payload.new as Record<string, unknown>;
-          const staticEntry = STATIC.find((s) => s.imo === row.imo || s.id === row.id);
-          if (!staticEntry) return;
+          const rowId = String(row.id ?? "");
+          const staticEntry = STATIC.find((s) => s.imo === row.imo || s.id === rowId);
+          const targetId = staticEntry?.id ?? rowId;
+          if (!targetId) return;
 
           const rawStatus = String(row.last_status ?? "").toLowerCase().replace(/ /g, "_");
           const isException = Number(row.ais_gaps_24h) > 0;
@@ -341,16 +344,24 @@ export default function MapPage() {
           const newLon = Number(row.last_position_lon);
           const newHeading = Number(row.last_heading) || 0;
 
-          patchMarker(staticEntry.id, newLat, newLon, newHeading, color);
+          patchMarker(targetId, newLat, newLon, newHeading, color);
 
           setVessels((prev) =>
             prev.map((v) =>
-              v.id === staticEntry.id
+              v.id === targetId
                 ? { ...v, lat: newLat, lon: newLon, heading: newHeading, speed: String(row.last_speed ?? v.speed), status: rawStatus || v.status, exception: isException, exceptionType: isException ? `AIS gap · ${row.ais_gaps_24h} gaps in 24h` : undefined, live: true }
                 : v
             )
           );
           setLastUpdated(new Date());
+        })
+        .on("postgres_changes", { event: "DELETE", schema: "public", table: "vessels" }, (payload) => {
+          const deletedId = String((payload.old as Record<string, unknown>).id ?? "");
+          if (!deletedId) return;
+          const entry = markersRef.current.get(deletedId);
+          if (entry) { entry.marker.remove(); markersRef.current.delete(deletedId); }
+          setVessels((prev) => prev.filter((v) => v.id !== deletedId));
+          setSelected((prev) => (prev?.id === deletedId ? null : prev));
         })
         .subscribe();
 
@@ -405,7 +416,7 @@ export default function MapPage() {
       const el = makeMarkerEl(color, newVessel.heading, false);
       const svg = el.querySelector("svg") as SVGSVGElement;
       el.addEventListener("click", (ev) => { ev.stopPropagation(); setSelected(newVessel); });
-      const marker = new maplibregl.Marker({ element: el })
+      const marker = new maplibregl.Marker({ element: el, anchor: "center" })
         .setLngLat([newVessel.lon, newVessel.lat])
         .addTo(mapRef.current);
       markersRef.current.set(newVessel.id, { marker, svg });
