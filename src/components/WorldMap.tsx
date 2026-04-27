@@ -22,28 +22,7 @@ export default function WorldMap() {
 
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: {
-        version: 8,
-        sources: {
-          satellite: {
-            type: "raster",
-            tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"],
-            tileSize: 256,
-            attribution: "© Esri",
-            maxzoom: 19,
-          },
-          labels: {
-            type: "raster",
-            tiles: ["https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"],
-            tileSize: 256,
-            maxzoom: 19,
-          },
-        },
-        layers: [
-          { id: "satellite-layer", type: "raster", source: "satellite" },
-          { id: "labels-layer",    type: "raster", source: "labels" },
-        ],
-      },
+      style: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
       center: [25, 22],
       zoom: 2.4,
       attributionControl: false,
