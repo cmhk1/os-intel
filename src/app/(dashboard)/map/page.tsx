@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import maplibregl from "maplibre-gl";
-import "maplibre-gl/dist/maplibre-gl.css";
+import mapboxgl from "mapbox-gl";
+import "mapbox-gl/dist/mapbox-gl.css";
 import { X, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -169,18 +169,21 @@ const STATUS_COLOR: Record<string, string> = {
 
 export default function MapPage() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<maplibregl.Map | null>(null);
+  const mapRef = useRef<mapboxgl.Map | null>(null);
   const [selected, setSelected] = useState<Vessel | null>(null);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
-    const map = new maplibregl.Map({
+    mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN!;
+
+    const map = new mapboxgl.Map({
       container: containerRef.current,
-      style: "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json",
+      style: "mapbox://styles/mapbox/dark-v11",
       center: [52, 22],
       zoom: 1.6,
       pitch: 25,
+      projection: { name: "globe" },
       attributionControl: false,
     });
 
@@ -191,9 +194,6 @@ export default function MapPage() {
 
     map.on("load", () => {
       map.resize();
-
-      // 3D globe projection
-      try { (map as any).setProjection({ type: "globe" }); } catch {}
 
       // Atmosphere — gives the globe its depth and glow
       try {
@@ -244,7 +244,7 @@ export default function MapPage() {
           animation: isEx ? "vcrit 0.9s ease-in-out infinite" : "vpulse 2s ease-in-out infinite",
         });
 
-        const popup = new maplibregl.Popup({ offset: 14, closeButton: false, maxWidth: "240px" })
+        const popup = new mapboxgl.Popup({ offset: 14, closeButton: false, maxWidth: "240px" })
           .setHTML(`<div style="background:#0f0f0f;border:1px solid #1f1f1f;padding:12px 14px;font-family:'JetBrains Mono',monospace;">
             <div style="color:#f5a524;font-size:10px;text-transform:uppercase;letter-spacing:0.15em;margin-bottom:3px;">${vessel.name}</div>
             <div style="color:#525252;font-size:10px;margin-bottom:8px;">IMO ${vessel.imo}</div>
@@ -260,7 +260,7 @@ export default function MapPage() {
           setSelected(vessel);
         });
 
-        new maplibregl.Marker({ element: el })
+        new mapboxgl.Marker({ element: el })
           .setLngLat([vessel.lon, vessel.lat])
           .setPopup(popup)
           .addTo(map);
@@ -283,12 +283,12 @@ export default function MapPage() {
           0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.7), 0 0 10px rgba(239,68,68,0.5); }
           40% { box-shadow: 0 0 0 7px rgba(239,68,68,0), 0 0 18px rgba(239,68,68,0.8); }
         }
-        .maplibregl-popup-content { background:#0f0f0f !important; border:1px solid #1f1f1f !important; border-radius:0 !important; padding:0 !important; box-shadow:0 8px 32px rgba(0,0,0,0.9) !important; }
-        .maplibregl-popup-tip { border-top-color:#0f0f0f !important; border-bottom-color:#0f0f0f !important; }
-        .maplibregl-ctrl-logo, .maplibregl-ctrl-attrib { display:none !important; }
-        .maplibregl-ctrl-group { background:rgba(15,15,15,0.9) !important; border:1px solid rgba(31,31,31,0.8) !important; border-radius:0 !important; }
-        .maplibregl-ctrl-group button { background:transparent !important; filter:invert(0.6); }
-        .maplibregl-ctrl-group button:hover { background:rgba(245,165,36,0.1) !important; }
+        .mapboxgl-popup-content { background:#0f0f0f !important; border:1px solid #1f1f1f !important; border-radius:0 !important; padding:0 !important; box-shadow:0 8px 32px rgba(0,0,0,0.9) !important; }
+        .mapboxgl-popup-tip { border-top-color:#0f0f0f !important; border-bottom-color:#0f0f0f !important; }
+        .mapboxgl-ctrl-logo, .mapboxgl-ctrl-attrib { display:none !important; }
+        .mapboxgl-ctrl-group { background:rgba(15,15,15,0.9) !important; border:1px solid rgba(31,31,31,0.8) !important; border-radius:0 !important; }
+        .mapboxgl-ctrl-group button { background:transparent !important; filter:invert(0.6); }
+        .mapboxgl-ctrl-group button:hover { background:rgba(245,165,36,0.1) !important; }
       `}</style>
 
       {/* Full-bleed container — map fills it, UI overlaid on top */}
