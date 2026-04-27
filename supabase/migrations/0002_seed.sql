@@ -21,7 +21,7 @@ values
   ('10000000-0000-0000-0000-000000000002', '9729395', '636018123', 'NEW ADVANCE', 'Crude Oil Tanker', 'Liberia', 319000, 2015, 'NYK Line', 1.2674, 103.8000, now() - interval '4 minutes', 14.1, 260, 'Under way using engine', 'SINGAPORE', now() + interval '18 hours'),
   ('10000000-0000-0000-0000-000000000003', '9820553', '352001234', 'STENA IMPULSE', 'Products Tanker', 'Panama', 49999, 2019, 'Stena Bulk', 51.9500, 4.1433, now() - interval '22 minutes', 0.2, 0, 'Moored', 'ROTTERDAM', null),
   ('10000000-0000-0000-0000-000000000004', '9465307', '636092123', 'EAGLE BOSTON', 'Crude Oil Tanker', 'Liberia', 113000, 2011, 'AET Tankers', 29.3759, 48.2756, now() - interval '8 minutes', 11.8, 135, 'Under way using engine', 'MINA AL AHMADI', now() + interval '6 hours'),
-  ('10000000-0000-0000-0000-000000000005', '9845711', '538008901', 'FRONT ALFA', 'Crude Oil Tanker', 'Marshall Islands', 157000, 2020, 'Frontline', 23.1167, 39.3167, now() - interval '35 minutes', 13.2, 45, 'Under way using engine', 'AIN SUKHNA', now() + interval '3 days')
+  ('10000000-0000-0000-0000-000000000005', '9845711', '538008901', 'FRONT ALFA', 'Crude Oil Tanker', 'Marshall Islands', 157000, 2020, 'Frontline', 23.12, 37.82, now() - interval '35 minutes', 13.2, 345, 'Under way using engine', 'AIN SUKHNA', now() + interval '3 days')
 on conflict (id) do nothing;
 
 -- ==== COUNTERPARTIES ====
