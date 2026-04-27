@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { X, ChevronRight } from "lucide-react";
+import { X, ChevronRight, Radio } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { createBrowserClient } from "@/lib/supabase/client";
 
-interface Vessel {
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface VesselDisplay {
   id: string;
   name: string;
   imo: string;
@@ -24,59 +27,68 @@ interface Vessel {
   dischargeLat: number;
   dischargeLon: number;
   speed: string;
+  heading: number;
   eta: string;
   status: string;
   exception: boolean;
   exceptionType?: string;
+  live: boolean;
 }
 
-const VESSELS: Vessel[] = [
+// ─── Static commercial data ───────────────────────────────────────────────────
+
+const STATIC: Omit<VesselDisplay, "live">[] = [
   {
-    id: "v1", name: "SEAWAYS ENDEAVOR", imo: "9776633",
+    id: "10000000-0000-0000-0000-000000000001",
+    name: "SEAWAYS ENDEAVOR", imo: "9776633",
     dealRef: "OIL-2026-0142", cargo: "Arab Light", quantity: "2,000,000 BBL",
     buyer: "Vitol S.A.", seller: "Saudi Aramco Trading",
     loadPort: "RAS TANURA", dischargePort: "FUJAIRAH",
-    lat: 25.82, lon: 55.12,
+    lat: 25.82, lon: 55.12, heading: 92,
     loadLat: 26.64, loadLon: 50.16, dischargeLat: 25.13, dischargeLon: 56.33,
     speed: "12.4", eta: "29 Apr", status: "in_transit",
     exception: true, exceptionType: "AIS gap · 6h silence",
   },
   {
-    id: "v2", name: "NEW ADVANCE", imo: "9729395",
+    id: "10000000-0000-0000-0000-000000000002",
+    name: "NEW ADVANCE", imo: "9729395",
     dealRef: "OIL-2026-0143", cargo: "Upper Zakum", quantity: "1,000,000 BBL",
     buyer: "Trafigura Pte Ltd", seller: "ADNOC Global Trading",
     loadPort: "DAS ISLAND", dischargePort: "SINGAPORE",
-    lat: 4.50, lon: 78.30,
+    lat: 4.50, lon: 78.30, heading: 135,
     loadLat: 24.52, loadLon: 52.87, dischargeLat: 1.27, dischargeLon: 103.80,
-    speed: "14.1", eta: "28 Apr", status: "loading",
+    speed: "14.1", eta: "28 Apr", status: "in_transit",
     exception: false,
   },
   {
-    id: "v3", name: "STENA IMPULSE", imo: "9820553",
+    id: "10000000-0000-0000-0000-000000000003",
+    name: "STENA IMPULSE", imo: "9820553",
     dealRef: "OIL-2026-0147", cargo: "Gasoil 10ppm", quantity: "300,000 MT",
     buyer: "Gunvor Group", seller: "Saudi Aramco Trading",
     loadPort: "ANTWERP", dischargePort: "ROTTERDAM",
-    lat: 51.95, lon: 4.14,
+    lat: 51.95, lon: 4.14, heading: 0,
     loadLat: 51.23, loadLon: 4.40, dischargeLat: 51.96, dischargeLon: 4.14,
     speed: "0.2", eta: "Arrived", status: "arriving",
     exception: false,
   },
   {
-    id: "v4", name: "EAGLE BOSTON", imo: "9465307",
+    id: "10000000-0000-0000-0000-000000000004",
+    name: "EAGLE BOSTON", imo: "9465307",
     dealRef: "OIL-2026-0144", cargo: "Kuwait Export", quantity: "1,200,000 BBL",
     buyer: "Vitol S.A.", seller: "KPC Kuwait Petroleum",
     loadPort: "MINA AL AHMADI", dischargePort: "CHIBA",
-    lat: 21.00, lon: 75.00,
+    lat: 21.00, lon: 75.00, heading: 75,
     loadLat: 29.08, loadLon: 48.13, dischargeLat: 35.60, dischargeLon: 140.08,
     speed: "11.8", eta: "12 May", status: "in_transit",
     exception: false,
   },
   {
-    id: "v5", name: "FRONT ALFA", imo: "9845711",
+    id: "10000000-0000-0000-0000-000000000005",
+    name: "FRONT ALFA", imo: "9845711",
     dealRef: "OIL-2026-0145", cargo: "Arab Light", quantity: "1,500,000 BBL",
     buyer: "Trafigura Pte Ltd", seller: "Saudi Aramco Trading",
     loadPort: "RAS TANURA", dischargePort: "AIN SUKHNA",
-    lat: 23.12, lon: 39.32,
+    lat: 23.12, lon: 39.32, heading: 45,
     loadLat: 26.64, loadLon: 50.16, dischargeLat: 29.57, dischargeLon: 32.55,
     speed: "13.2", eta: "30 Apr", status: "in_transit",
     exception: false,
@@ -86,7 +98,7 @@ const VESSELS: Vessel[] = [
     dealRef: "OIL-2026-0148", cargo: "HSFO 380", quantity: "80,000 MT",
     buyer: "Gunvor Group", seller: "ADNOC Global Trading",
     loadPort: "FUJAIRAH", dischargePort: "HOUSTON",
-    lat: 15.00, lon: 25.00,
+    lat: 15.00, lon: 25.00, heading: 300,
     loadLat: 25.13, loadLon: 56.33, dischargeLat: 29.75, dischargeLon: -95.37,
     speed: "13.8", eta: "15 May", status: "in_transit",
     exception: false,
@@ -96,7 +108,7 @@ const VESSELS: Vessel[] = [
     dealRef: "OIL-2026-0149", cargo: "Arab Medium", quantity: "2,100,000 BBL",
     buyer: "Trafigura Pte Ltd", seller: "ADNOC Global Trading",
     loadPort: "JUBAIL", dischargePort: "YOKOHAMA",
-    lat: 10.00, lon: 68.00,
+    lat: 10.00, lon: 68.00, heading: 70,
     loadLat: 27.01, loadLon: 49.65, dischargeLat: 35.44, dischargeLon: 139.64,
     speed: "14.3", eta: "18 May", status: "in_transit",
     exception: false,
@@ -106,7 +118,7 @@ const VESSELS: Vessel[] = [
     dealRef: "OIL-2026-0150", cargo: "Basra Heavy", quantity: "1,900,000 BBL",
     buyer: "Vitol S.A.", seller: "KPC Kuwait Petroleum",
     loadPort: "BASRA", dischargePort: "ROTTERDAM",
-    lat: 29.98, lon: 48.78,
+    lat: 29.98, lon: 48.78, heading: 0,
     loadLat: 29.98, loadLon: 48.78, dischargeLat: 51.96, dischargeLon: 4.14,
     speed: "0.0", eta: "8 May", status: "loading",
     exception: false,
@@ -116,7 +128,7 @@ const VESSELS: Vessel[] = [
     dealRef: "OIL-2026-0151", cargo: "Upper Zakum", quantity: "800,000 BBL",
     buyer: "Gunvor Group", seller: "ADNOC Global Trading",
     loadPort: "DAS ISLAND", dischargePort: "SINGAPORE",
-    lat: 14.00, lon: 62.00,
+    lat: 14.00, lon: 62.00, heading: 115,
     loadLat: 24.52, loadLon: 52.87, dischargeLat: 1.27, dischargeLon: 103.80,
     speed: "13.5", eta: "5 May", status: "in_transit",
     exception: false,
@@ -126,7 +138,7 @@ const VESSELS: Vessel[] = [
     dealRef: "OIL-2026-0152", cargo: "Gasoil 50ppm", quantity: "120,000 MT",
     buyer: "Vitol S.A.", seller: "Saudi Aramco Trading",
     loadPort: "ROTTERDAM", dischargePort: "HOUSTON",
-    lat: 44.00, lon: -28.00,
+    lat: 44.00, lon: -28.00, heading: 270,
     loadLat: 51.96, loadLon: 4.14, dischargeLat: 29.75, dischargeLon: -95.37,
     speed: "14.0", eta: "3 May", status: "in_transit",
     exception: false,
@@ -136,7 +148,7 @@ const VESSELS: Vessel[] = [
     dealRef: "OIL-2026-0153", cargo: "LNG", quantity: "65,000 MT",
     buyer: "Trafigura Pte Ltd", seller: "ADNOC Global Trading",
     loadPort: "QATARGAS", dischargePort: "TOKYO",
-    lat: 18.00, lon: 82.00,
+    lat: 18.00, lon: 82.00, heading: 60,
     loadLat: 25.29, loadLon: 51.53, dischargeLat: 35.65, dischargeLon: 139.76,
     speed: "18.2", eta: "2 May", status: "in_transit",
     exception: false,
@@ -146,31 +158,121 @@ const VESSELS: Vessel[] = [
     dealRef: "OIL-2026-0154", cargo: "Arab Light", quantity: "1,800,000 BBL",
     buyer: "Gunvor Group", seller: "Saudi Aramco Trading",
     loadPort: "AIN SUKHNA", dischargePort: "ROTTERDAM",
-    lat: 34.50, lon: 22.00,
+    lat: 34.50, lon: 22.00, heading: 315,
     loadLat: 29.57, loadLon: 32.55, dischargeLat: 51.96, dischargeLon: 4.14,
     speed: "13.0", eta: "4 May", status: "in_transit",
     exception: false,
   },
 ];
 
-const STATUS_LABEL: Record<string, string> = {
-  in_transit: "in transit",
-  loading: "loading",
-  arriving: "arriving",
-  delayed: "delayed",
-};
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const STATUS_COLOR: Record<string, string> = {
   in_transit: "#f5a524",
+  "under way using engine": "#f5a524",
   loading: "#3b82f6",
   arriving: "#10b981",
+  moored: "#6b7280",
   delayed: "#ef4444",
 };
+
+function vesselColor(status: string, exception: boolean): string {
+  if (exception) return "#ef4444";
+  return STATUS_COLOR[status.toLowerCase()] ?? "#f5a524";
+}
+
+function relativeTime(date: Date): string {
+  const s = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (s < 60) return `${s}s ago`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  return `${Math.floor(s / 3600)}h ago`;
+}
+
+// Circle + directional arrowhead, rotated to heading direction
+function makeMarkerEl(color: string, heading: number, exception: boolean): HTMLElement {
+  const wrap = document.createElement("div");
+  wrap.style.cssText = "position:relative;width:28px;height:28px;cursor:pointer;";
+
+  const glow = document.createElement("div");
+  glow.className = exception ? "vex-glow" : "vnorm-glow";
+  glow.style.cssText = `position:absolute;inset:-6px;border-radius:50%;background:${color};opacity:0.18;pointer-events:none;`;
+  wrap.appendChild(glow);
+
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 28 28");
+  svg.setAttribute("width", "28");
+  svg.setAttribute("height", "28");
+  svg.style.cssText = `position:absolute;inset:0;transform:rotate(${heading}deg);transform-origin:14px 14px;overflow:visible;`;
+  // Circle centred at (14,14), arrowhead pointing north (up = 0°), rotated by heading
+  svg.innerHTML = `
+    <circle cx="14" cy="14" r="5" fill="${color}" stroke="rgba(0,0,0,0.55)" stroke-width="1.5"/>
+    <polygon points="14,3 11,10 17,10" fill="${color}" opacity="0.85"/>
+  `;
+  wrap.appendChild(svg);
+  return wrap;
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function MapPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
-  const [selected, setSelected] = useState<Vessel | null>(null);
+  const markersRef = useRef<Map<string, { marker: maplibregl.Marker; svg: SVGSVGElement }>>(new Map());
+
+  const [vessels, setVessels] = useState<VesselDisplay[]>([]);
+  const [selected, setSelected] = useState<VesselDisplay | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [, setTick] = useState(0);
+
+  const mergeWithLive = useCallback((rows: Record<string, unknown>[]): VesselDisplay[] => {
+    const merged = STATIC.map((s) => ({ ...s, live: false }));
+    for (const row of rows) {
+      const idx = merged.findIndex((v) => v.imo === row.imo || v.id === row.id);
+      if (idx < 0) continue;
+      const rawStatus = String(row.last_status ?? "").toLowerCase().replace(/ /g, "_");
+      merged[idx] = {
+        ...merged[idx],
+        lat: Number(row.last_position_lat) || merged[idx].lat,
+        lon: Number(row.last_position_lon) || merged[idx].lon,
+        heading: Number(row.last_heading) || merged[idx].heading,
+        speed: String(row.last_speed ?? merged[idx].speed),
+        status: rawStatus || merged[idx].status,
+        exception: Number(row.ais_gaps_24h) > 0,
+        exceptionType: Number(row.ais_gaps_24h) > 0 ? `AIS gap · ${row.ais_gaps_24h} gaps in 24h` : undefined,
+        live: true,
+      };
+    }
+    return merged;
+  }, []);
+
+  const patchMarker = useCallback((id: string, lat: number, lon: number, heading: number, color: string) => {
+    const entry = markersRef.current.get(id);
+    if (!entry) return;
+    entry.marker.setLngLat([lon, lat]);
+    entry.svg.style.transform = `rotate(${heading}deg)`;
+    entry.svg.querySelectorAll("circle,polygon").forEach((el) => el.setAttribute("fill", color));
+  }, []);
+
+  const buildMarkers = useCallback((map: maplibregl.Map, list: VesselDisplay[], onSelect: (v: VesselDisplay) => void) => {
+    markersRef.current.forEach(({ marker }) => marker.remove());
+    markersRef.current.clear();
+
+    list.forEach((v) => {
+      const color = vesselColor(v.status, v.exception);
+      const el = makeMarkerEl(color, v.heading, v.exception);
+      const svg = el.querySelector("svg") as SVGSVGElement;
+
+      el.addEventListener("click", (e) => { e.stopPropagation(); onSelect(v); });
+
+      const marker = new maplibregl.Marker({ element: el })
+        .setLngLat([v.lon, v.lat])
+        .addTo(map);
+
+      markersRef.current.set(v.id, { marker, svg });
+    });
+  }, []);
+
+  // ── Map init + data ───────────────────────────────────────────────────────
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -183,120 +285,110 @@ export default function MapPage() {
       pitch: 25,
       attributionControl: false,
     });
-
     mapRef.current = map;
-
-    // Force resize after layout settles
     setTimeout(() => map.resize(), 100);
 
-    map.on("load", () => {
+    map.on("load", async () => {
       map.resize();
-
-      // 3D globe projection
-      try { (map as any).setProjection({ type: "globe" }); } catch {}
-
-      // Atmosphere — gives the globe its depth and glow
+      try { (map as maplibregl.Map & { setProjection(p: unknown): void }).setProjection({ type: "globe" }); } catch { /* */ }
       try {
-        (map as any).setFog({
-          color: "rgba(10,10,10,0.5)",
-          "high-color": "#000a14",
-          "horizon-blend": 0.06,
-          "space-color": "#000000",
-          "star-intensity": 0.45,
+        (map as unknown as { setFog(f: unknown): void }).setFog({
+          color: "rgba(10,10,10,0.5)", "high-color": "#000a14",
+          "horizon-blend": 0.06, "space-color": "#000000", "star-intensity": 0.45,
         });
-      } catch {}
+      } catch { /* */ }
 
-      // Routes
-      const normalRoutes = VESSELS.filter((v) => !v.exception).map((v) => ({
-        type: "Feature" as const,
-        properties: {},
-        geometry: {
-          type: "LineString" as const,
-          coordinates: [[v.loadLon, v.loadLat], [v.lon, v.lat], [v.dischargeLon, v.dischargeLat]],
-        },
-      }));
+      // Fetch live positions
+      const supabase = createBrowserClient();
+      const { data: rows } = await supabase
+        .from("vessels")
+        .select("id,imo,name,last_position_lat,last_position_lon,last_position_at,last_speed,last_heading,last_status,ais_gaps_24h");
 
-      const exceptionRoutes = VESSELS.filter((v) => v.exception).map((v) => ({
-        type: "Feature" as const,
-        properties: {},
-        geometry: {
-          type: "LineString" as const,
-          coordinates: [[v.loadLon, v.loadLat], [v.lon, v.lat], [v.dischargeLon, v.dischargeLat]],
-        },
-      }));
+      const list = mergeWithLive((rows ?? []) as Record<string, unknown>[]);
+      setVessels(list);
+      setLastUpdated(new Date());
 
-      map.addSource("routes", { type: "geojson", data: { type: "FeatureCollection", features: normalRoutes } });
-      map.addLayer({ id: "routes", type: "line", source: "routes", paint: { "line-color": "#f5a524", "line-width": 0.8, "line-opacity": 0.35, "line-dasharray": [2, 3] } as any });
+      // Route lines
+      const routeFeatures = (exception: boolean) =>
+        list.filter((v) => v.exception === exception).map((v) => ({
+          type: "Feature" as const,
+          properties: {},
+          geometry: {
+            type: "LineString" as const,
+            coordinates: [[v.loadLon, v.loadLat], [v.lon, v.lat], [v.dischargeLon, v.dischargeLat]],
+          },
+        }));
 
-      map.addSource("routes-ex", { type: "geojson", data: { type: "FeatureCollection", features: exceptionRoutes } });
-      map.addLayer({ id: "routes-ex", type: "line", source: "routes-ex", paint: { "line-color": "#ef4444", "line-width": 1, "line-opacity": 0.55, "line-dasharray": [2, 2] } as any });
+      map.addSource("routes", { type: "geojson", data: { type: "FeatureCollection", features: routeFeatures(false) } });
+      map.addLayer({ id: "routes", type: "line", source: "routes", paint: { "line-color": "#f5a524", "line-width": 0.8, "line-opacity": 0.28, "line-dasharray": [2, 3] } as maplibregl.LinePaint });
+      map.addSource("routes-ex", { type: "geojson", data: { type: "FeatureCollection", features: routeFeatures(true) } });
+      map.addLayer({ id: "routes-ex", type: "line", source: "routes-ex", paint: { "line-color": "#ef4444", "line-width": 1, "line-opacity": 0.5, "line-dasharray": [2, 2] } as maplibregl.LinePaint });
 
-      // Vessel markers
-      VESSELS.forEach((vessel) => {
-        const el = document.createElement("div");
-        const isEx = vessel.exception;
-        Object.assign(el.style, {
-          width: "10px",
-          height: "10px",
-          borderRadius: "50%",
-          background: isEx ? "#ef4444" : "#f5a524",
-          cursor: "pointer",
-          animation: isEx ? "vcrit 0.9s ease-in-out infinite" : "vpulse 2s ease-in-out infinite",
-        });
+      buildMarkers(map, list, setSelected);
 
-        const popup = new maplibregl.Popup({ offset: 14, closeButton: false, maxWidth: "240px" })
-          .setHTML(`<div style="background:#0f0f0f;border:1px solid #1f1f1f;padding:12px 14px;font-family:'JetBrains Mono',monospace;">
-            <div style="color:#f5a524;font-size:10px;text-transform:uppercase;letter-spacing:0.15em;margin-bottom:3px;">${vessel.name}</div>
-            <div style="color:#525252;font-size:10px;margin-bottom:8px;">IMO ${vessel.imo}</div>
-            <div style="color:#f5a524;font-size:10px;margin-bottom:6px;">${vessel.dealRef}</div>
-            <div style="color:#c4c4c4;font-size:11px;">${vessel.cargo}</div>
-            <div style="color:#525252;font-size:10px;margin-top:3px;">${vessel.loadPort} → ${vessel.dischargePort}</div>
-            <div style="color:#8a8a8a;font-size:10px;margin-top:6px;">ETA ${vessel.eta} · ${vessel.speed}kn</div>
-            ${isEx ? `<div style="color:#ef4444;font-size:10px;margin-top:6px;text-transform:uppercase;letter-spacing:0.1em;">⚠ ${vessel.exceptionType}</div>` : ""}
-          </div>`);
+      // Realtime: patch individual markers when AIS ingest updates a vessel
+      const channel = supabase
+        .channel("live-vessels")
+        .on("postgres_changes", { event: "UPDATE", schema: "public", table: "vessels" }, (payload) => {
+          const row = payload.new as Record<string, unknown>;
+          const staticEntry = STATIC.find((s) => s.imo === row.imo || s.id === row.id);
+          if (!staticEntry) return;
 
-        el.addEventListener("click", (e) => {
-          e.stopPropagation();
-          setSelected(vessel);
-        });
+          const rawStatus = String(row.last_status ?? "").toLowerCase().replace(/ /g, "_");
+          const isException = Number(row.ais_gaps_24h) > 0;
+          const color = vesselColor(rawStatus, isException);
+          const newLat = Number(row.last_position_lat);
+          const newLon = Number(row.last_position_lon);
+          const newHeading = Number(row.last_heading) || 0;
 
-        new maplibregl.Marker({ element: el })
-          .setLngLat([vessel.lon, vessel.lat])
-          .setPopup(popup)
-          .addTo(map);
-      });
+          patchMarker(staticEntry.id, newLat, newLon, newHeading, color);
+
+          setVessels((prev) =>
+            prev.map((v) =>
+              v.id === staticEntry.id
+                ? { ...v, lat: newLat, lon: newLon, heading: newHeading, speed: String(row.last_speed ?? v.speed), status: rawStatus || v.status, exception: isException, exceptionType: isException ? `AIS gap · ${row.ais_gaps_24h} gaps in 24h` : undefined, live: true }
+                : v
+            )
+          );
+          setLastUpdated(new Date());
+        })
+        .subscribe();
+
+      return () => { supabase.removeChannel(channel); };
     });
 
     return () => { map.remove(); mapRef.current = null; };
+  }, [buildMarkers, mergeWithLive, patchMarker]);
+
+  // Keep relative timestamps fresh every 30s
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 30_000);
+    return () => clearInterval(id);
   }, []);
 
-  const exceptions = VESSELS.filter((v) => v.exception);
+  const exceptions = vessels.filter((v) => v.exception);
+  const liveCount = vessels.filter((v) => v.live).length;
 
   return (
     <>
       <style>{`
-        @keyframes vpulse {
-          0%,100% { box-shadow: 0 0 0 0 rgba(245,165,36,0.5), 0 0 8px rgba(245,165,36,0.4); }
-          50% { box-shadow: 0 0 0 5px rgba(245,165,36,0), 0 0 14px rgba(245,165,36,0.6); }
-        }
-        @keyframes vcrit {
-          0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.7), 0 0 10px rgba(239,68,68,0.5); }
-          40% { box-shadow: 0 0 0 7px rgba(239,68,68,0), 0 0 18px rgba(239,68,68,0.8); }
-        }
-        .maplibregl-popup-content { background:#0f0f0f !important; border:1px solid #1f1f1f !important; border-radius:0 !important; padding:0 !important; box-shadow:0 8px 32px rgba(0,0,0,0.9) !important; }
-        .maplibregl-popup-tip { border-top-color:#0f0f0f !important; border-bottom-color:#0f0f0f !important; }
-        .maplibregl-ctrl-logo, .maplibregl-ctrl-attrib { display:none !important; }
-        .maplibregl-ctrl-group { background:rgba(15,15,15,0.9) !important; border:1px solid rgba(31,31,31,0.8) !important; border-radius:0 !important; }
-        .maplibregl-ctrl-group button { background:transparent !important; filter:invert(0.6); }
-        .maplibregl-ctrl-group button:hover { background:rgba(245,165,36,0.1) !important; }
+        @keyframes vnorm { 0%,100%{opacity:.18;transform:scale(1)} 50%{opacity:.06;transform:scale(1.7)} }
+        @keyframes vex   { 0%,100%{opacity:.28;transform:scale(1)} 40%{opacity:.1;transform:scale(1.9)} }
+        .vnorm-glow{animation:vnorm 2.6s ease-in-out infinite}
+        .vex-glow  {animation:vex   0.85s ease-in-out infinite}
+        .maplibregl-popup-content{background:#0c0c0c!important;border:1px solid #222!important;border-radius:0!important;padding:0!important;box-shadow:0 12px 40px rgba(0,0,0,.95)!important}
+        .maplibregl-popup-tip{border-top-color:#0c0c0c!important;border-bottom-color:#0c0c0c!important}
+        .maplibregl-ctrl-logo,.maplibregl-ctrl-attrib{display:none!important}
+        .maplibregl-ctrl-group{background:rgba(12,12,12,.9)!important;border:1px solid rgba(40,40,40,.8)!important;border-radius:0!important}
+        .maplibregl-ctrl-group button{background:transparent!important;filter:invert(.6)}
+        .maplibregl-ctrl-group button:hover{background:rgba(245,165,36,.1)!important}
       `}</style>
 
-      {/* Full-bleed container — map fills it, UI overlaid on top */}
       <div style={{ position: "relative", width: "100%", height: "calc(100vh - 56px)", overflow: "hidden" }}>
-        <div ref={containerRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
+        <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />
 
-        {/* Top fade */}
-        <div className="absolute top-0 inset-x-0 h-28 bg-gradient-to-b from-black/75 to-transparent pointer-events-none z-10" />
+        {/* Top vignette */}
+        <div className="absolute top-0 inset-x-0 h-32 bg-gradient-to-b from-black/80 to-transparent pointer-events-none z-10" />
 
         {/* Header */}
         <div className="absolute top-5 left-6 z-20">
@@ -304,31 +396,38 @@ export default function MapPage() {
           <h1 className="font-display text-3xl tracking-tight drop-shadow-lg">World book</h1>
         </div>
 
-        {/* Status badges — top right */}
-        <div className="absolute top-5 right-6 z-20 flex items-center gap-4">
+        {/* Status strip — top right */}
+        <div className="absolute top-5 right-6 z-20 flex items-center gap-3">
           {exceptions.length > 0 && (
-            <div className="flex items-center gap-1.5 font-mono text-[10px] text-crimson uppercase tracking-wider bg-black/60 px-2.5 py-1 backdrop-blur-sm border border-crimson-muted/40">
+            <div className="flex items-center gap-1.5 font-mono text-[10px] text-crimson uppercase tracking-wider bg-black/70 px-2.5 py-1.5 border border-crimson/30 backdrop-blur-sm">
               <span className="w-1.5 h-1.5 rounded-full bg-crimson animate-pulse" />
-              {exceptions.length} exception{exceptions.length > 1 ? "s" : ""}
+              {exceptions.length} exception{exceptions.length !== 1 ? "s" : ""}
             </div>
           )}
-          <div className="flex items-center gap-1.5 font-mono text-[10px] text-ink-300 bg-black/60 px-2.5 py-1 backdrop-blur-sm">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald animate-pulse" />
-            {VESSELS.length} vessels · 4s ago
+          <div className="flex items-center gap-1.5 font-mono text-[10px] bg-black/70 px-2.5 py-1.5 border border-ink-600/40 backdrop-blur-sm">
+            <Radio className={cn("w-3 h-3", liveCount > 0 ? "text-emerald" : "text-ink-500")} />
+            <span className={liveCount > 0 ? "text-emerald" : "text-ink-400"}>
+              {liveCount > 0 ? `${liveCount} live` : "connecting"}
+            </span>
+            {lastUpdated && (
+              <span className="text-ink-500 ml-1" suppressHydrationWarning>
+                · {relativeTime(lastUpdated)}
+              </span>
+            )}
           </div>
         </div>
 
-        {/* Bottom fade */}
-        <div className="absolute bottom-0 inset-x-0 h-36 bg-gradient-to-t from-black/90 to-transparent pointer-events-none z-10" />
+        {/* Bottom vignette */}
+        <div className="absolute bottom-0 inset-x-0 h-40 bg-gradient-to-t from-black/90 to-transparent pointer-events-none z-10" />
 
-        {/* KPI strip — bottom */}
-        <div className="absolute bottom-6 left-6 right-6 z-20 grid grid-cols-3 gap-px bg-ink-600/40 border border-ink-600/40">
+        {/* KPI strip */}
+        <div className="absolute bottom-6 left-6 right-6 z-20 grid grid-cols-3 gap-px bg-ink-600/30 border border-ink-600/30">
           {[
-            { label: "Vessels at sea", value: `${VESSELS.filter(v => v.status === "in_transit").length}`, sub: "in transit", danger: false },
+            { label: "Vessels at sea", value: String(vessels.filter((v) => v.status === "in_transit" || v.status === "under_way_using_engine").length), sub: "in transit", danger: false },
             { label: "Notional", value: "$1.2B", sub: "gross at sea", danger: false },
-            { label: "Exceptions", value: `${exceptions.length}`, sub: "needs action", danger: exceptions.length > 0 },
+            { label: "Exceptions", value: String(exceptions.length), sub: "needs action", danger: exceptions.length > 0 },
           ].map((k) => (
-            <div key={k.label} className="bg-black/70 backdrop-blur-sm px-6 py-4">
+            <div key={k.label} className="bg-black/75 backdrop-blur-sm px-6 py-4">
               <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-400 mb-2">{k.label}</div>
               <div className={cn("font-display text-3xl text-tabular", k.danger ? "text-crimson" : "text-amber")}>{k.value}</div>
               <div className="font-mono text-[10px] text-ink-500 uppercase tracking-wider mt-1">{k.sub}</div>
@@ -337,7 +436,7 @@ export default function MapPage() {
         </div>
       </div>
 
-      {/* Slide-over */}
+      {/* Vessel detail slide-over */}
       {selected && (
         <div className="fixed inset-0 z-50" onClick={() => setSelected(null)}>
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
@@ -347,65 +446,64 @@ export default function MapPage() {
           >
             <div className="px-6 py-4 border-b border-ink-600/60 flex items-center justify-between sticky top-0 bg-ink z-10">
               <div>
-                <div className="font-mono text-[10px] text-amber uppercase tracking-wider mb-1">{selected.dealRef}</div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="font-mono text-[10px] text-amber uppercase tracking-wider">{selected.dealRef}</span>
+                  {selected.live && (
+                    <span className="flex items-center gap-1 font-mono text-[9px] text-emerald uppercase tracking-wider">
+                      <span className="w-1 h-1 rounded-full bg-emerald animate-pulse" /> live
+                    </span>
+                  )}
+                </div>
                 <div className="font-mono text-sm text-white">{selected.name}</div>
               </div>
-              <button onClick={() => setSelected(null)} className="text-ink-400 hover:text-white transition-colors">
+              <button onClick={() => setSelected(null)} className="text-ink-400 hover:text-white transition-colors p-1">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <div className="p-6 space-y-6">
               {selected.exception && (
-                <div className="bg-crimson-muted/20 border border-crimson-muted/40 px-4 py-3">
+                <div className="bg-crimson/5 border border-crimson/30 px-4 py-3">
                   <div className="font-mono text-[10px] text-crimson uppercase tracking-wider mb-1">⚠ Exception</div>
                   <div className="font-mono text-[11px] text-ink-200">{selected.exceptionType}</div>
                 </div>
               )}
 
-              <div>
+              <section>
                 <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-400 mb-3">Vessel</div>
                 <div className="space-y-2">
-                  {[["IMO", selected.imo], ["Speed", `${selected.speed}kn`], ["Status", STATUS_LABEL[selected.status] || selected.status]].map(([k, v]) => (
+                  {([["IMO", selected.imo], ["Speed", `${selected.speed} kn`], ["Heading", `${selected.heading}°`], ["Status", selected.status.replace(/_/g, " ")]] as [string, string][]).map(([k, v]) => (
                     <div key={k} className="flex justify-between font-mono text-[11px]">
                       <span className="text-ink-400">{k}</span>
                       <span className="text-white">{v}</span>
                     </div>
                   ))}
                 </div>
-              </div>
+              </section>
 
-              <div>
+              <section>
                 <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-400 mb-3">Trade</div>
                 <div className="space-y-2">
-                  {[
-                    ["Cargo", selected.cargo],
-                    ["Quantity", selected.quantity],
-                    ["Buyer", selected.buyer],
-                    ["Seller", selected.seller],
-                    ["Load", selected.loadPort],
-                    ["Discharge", selected.dischargePort],
-                    ["ETA", selected.eta],
-                  ].map(([k, v]) => (
+                  {([["Cargo", selected.cargo], ["Quantity", selected.quantity], ["Buyer", selected.buyer], ["Seller", selected.seller], ["Load", selected.loadPort], ["Discharge", selected.dischargePort], ["ETA", selected.eta]] as [string, string][]).map(([k, v]) => (
                     <div key={k} className="flex justify-between font-mono text-[11px]">
                       <span className="text-ink-400">{k}</span>
                       <span className="text-white text-right max-w-[200px] truncate">{v}</span>
                     </div>
                   ))}
                 </div>
-              </div>
+              </section>
 
-              <div>
+              <section>
                 <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-400 mb-3">Agent activity</div>
                 <div className="divide-y divide-ink-600/30">
                   {[
-                    { agent: "Vessel Agent", action: "Position confirmed", time: "4m ago" },
-                    { agent: "Document Agent", action: "B/L matched to contract", time: "2h ago" },
-                    { agent: "Compliance Agent", action: "Sanctions clear", time: "6h ago" },
-                    { agent: "Finance Agent", action: "LC open · $" + (selected.quantity.replace(/,/g, "").split(" ")[0] !== "65" ? "158.9M" : "51.2M"), time: "1d ago" },
-                  ].map((item, i) => (
-                    <div key={i} className="py-2.5 flex gap-2.5">
-                      <div className="w-1 h-1 rounded-full bg-ink-500 mt-1.5 shrink-0" />
+                    { agent: "VesselAgent", action: "Position confirmed", time: "4m ago" },
+                    { agent: "DocumentAgent", action: "B/L matched to contract", time: "2h ago" },
+                    { agent: "ComplianceAgent", action: "Sanctions clear", time: "6h ago" },
+                    { agent: "FinanceAgent", action: "LC open · $158.9M", time: "1d ago" },
+                  ].map((item) => (
+                    <div key={item.agent} className="py-2.5 flex gap-3">
+                      <span className="w-1 h-1 rounded-full bg-ink-500 mt-2 shrink-0" />
                       <div>
                         <div className="font-mono text-[10px] text-amber">{item.agent}</div>
                         <div className="font-mono text-[10px] text-ink-300">{item.action}</div>
@@ -414,7 +512,7 @@ export default function MapPage() {
                     </div>
                   ))}
                 </div>
-              </div>
+              </section>
 
               <button className="w-full flex items-center justify-center gap-2 border border-amber/30 bg-amber/10 text-amber font-mono text-[11px] uppercase tracking-wider py-2.5 hover:bg-amber/20 transition-colors">
                 Open deal <ChevronRight className="w-3.5 h-3.5" />
