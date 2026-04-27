@@ -6,3 +6,8 @@ export function getSupabase() {
   if (!url || !key) throw new Error("Supabase env vars not set");
   return createClient(url, key);
 }
+
+/** Alias used by client components and API routes */
+export function createBrowserClient() {
+  return getSupabase();
+}
