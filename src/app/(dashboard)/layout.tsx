@@ -8,11 +8,15 @@ import {
   GitBranch,
   Banknote,
   Sparkles,
+  Globe2,
+  Bot,
 } from "lucide-react";
 import CommandBar from "@/components/CommandBar";
 
 const nav = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
+  { href: "/map", label: "Map", icon: Globe2 },
+  { href: "/agents", label: "Agents", icon: Bot },
   { href: "/deals", label: "Deals", icon: GitBranch },
   { href: "/vessels", label: "Vessels", icon: Ship },
   { href: "/documents", label: "Documents", icon: FileText },
