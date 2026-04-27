@@ -8,7 +8,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const LISTEN_MS = 25_000;
+const LISTEN_MS = 15_000;
 
 const NAV_STATUS: Record<number, string> = {
   0: "Under way using engine",
