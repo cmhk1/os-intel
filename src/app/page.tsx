@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase/client";
+import { getSupabase } from "@/lib/supabase/client";
 
 export default function Home() {
   const router = useRouter();
@@ -38,7 +38,7 @@ export default function Home() {
     if (!valid) return;
 
     setContactSubmitting(true);
-    const { error } = await supabase.from("contact_submissions").insert([{
+    const { error } = await getSupabase().from("contact_submissions").insert([{
       name: contactFields.name.trim(),
       company: contactFields.company.trim(),
       email: contactFields.email.trim(),
