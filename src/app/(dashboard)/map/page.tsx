@@ -186,9 +186,14 @@ export default function MapPage() {
 
     mapRef.current = map;
 
+    // Force resize after layout settles
+    setTimeout(() => map.resize(), 100);
+
     map.on("load", () => {
+      map.resize();
+
       // 3D globe projection
-      try { (map as any).setProjection("globe"); } catch {}
+      try { (map as any).setProjection({ type: "globe" }); } catch {}
 
       // Atmosphere — gives the globe its depth and glow
       try {
@@ -287,8 +292,8 @@ export default function MapPage() {
       `}</style>
 
       {/* Full-bleed container — map fills it, UI overlaid on top */}
-      <div className="relative w-full overflow-hidden" style={{ height: "calc(100vh - 56px)" }}>
-        <div ref={containerRef} className="absolute inset-0" />
+      <div style={{ position: "relative", width: "100%", height: "calc(100vh - 56px)", overflow: "hidden" }}>
+        <div ref={containerRef} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
 
         {/* Top fade */}
         <div className="absolute top-0 inset-x-0 h-28 bg-gradient-to-b from-black/75 to-transparent pointer-events-none z-10" />
