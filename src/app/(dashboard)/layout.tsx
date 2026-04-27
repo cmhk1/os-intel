@@ -3,13 +3,12 @@ import {
   LayoutDashboard,
   Ship,
   FileText,
-  Users,
-  Zap,
   GitBranch,
   Banknote,
   Sparkles,
   Globe2,
   Bot,
+  Zap,
 } from "lucide-react";
 import CommandBar from "@/components/CommandBar";
 
@@ -20,7 +19,6 @@ const nav = [
   { href: "/deals", label: "Deals", icon: GitBranch },
   { href: "/vessels", label: "Vessels", icon: Ship },
   { href: "/documents", label: "Documents", icon: FileText },
-  { href: "/counterparties", label: "Counterparties", icon: Users },
   { href: "/triggers", label: "Triggers", icon: Zap },
   { href: "/lending", label: "Lending", icon: Banknote },
   { href: "/copilot", label: "Copilot", icon: Sparkles },
