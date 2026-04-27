@@ -70,22 +70,25 @@ export default function CommandBar() {
         body: JSON.stringify({ mmsi: input.trim() }),
       });
 
+      const data = await res.json().catch(() => ({})) as Record<string, unknown>;
+
       if (res.status === 404) {
         setModalState("error_404");
         return;
       }
       if (!res.ok) {
+        const msg = String(data.error ?? data.message ?? `HTTP ${res.status}`);
+        setErrorMsg(msg);
         setModalState("error_generic");
         return;
       }
 
-      const data = (await res.json()) as { vessel: VesselResult };
+      const vessel = data.vessel as VesselResult;
       setOpen(false);
-      window.dispatchEvent(
-        new CustomEvent("os:vessel-found", { detail: data.vessel })
-      );
-      setToast(`${data.vessel.name} added to map`);
-    } catch {
+      window.dispatchEvent(new CustomEvent("os:vessel-found", { detail: vessel }));
+      setToast(`${vessel.name} added to map`);
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Network error");
       setModalState("error_generic");
     }
   }, [input, isMMSI]);
@@ -174,10 +177,13 @@ export default function CommandBar() {
               </div>
             )}
             {modalState === "error_generic" && (
-              <div className="px-4 py-3 flex items-center gap-2.5">
+              <div className="px-4 py-3 flex flex-col gap-1">
                 <span className="font-mono text-[11px] text-crimson uppercase tracking-wider">
-                  AIS lookup failed — check your connection
+                  AIS lookup failed
                 </span>
+                {errorMsg && (
+                  <span className="font-mono text-[10px] text-ink-400">{errorMsg}</span>
+                )}
               </div>
             )}
           </div>
