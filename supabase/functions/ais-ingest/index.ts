@@ -3,7 +3,7 @@
  *
  * Called every 5 minutes by GitHub Actions.
  * Connects to AISStream WebSocket, subscribes to all tracked vessel MMSIs,
- * collects position reports for up to 25 seconds, then upserts into the DB.
+ * collects position reports for up to 15 seconds, then upserts into the DB.
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -104,19 +104,24 @@ Deno.serve(async (req) => {
       try {
         const msg = JSON.parse(event.data as string);
         const mmsi = String(msg.MetaData?.MMSI ?? "");
-        if (!mmsi || !byMmsi[mmsi]) return;
+        if (!mmsi) return;
+        // Cron mode: must be in tracked DB list. Lookup mode: must match request.
+        if (!singleMmsi && !byMmsi[mmsi]) return;
+        if (singleMmsi && mmsi !== singleMmsi) return;
 
         if (msg.MessageType === "PositionReport") {
           const pr = msg.Message?.PositionReport;
           if (!pr) return;
+          const prevDest = fixes.get(mmsi)?.destination ?? null;
+          const prevName = fixes.get(mmsi)?.shipName ?? null;
           fixes.set(mmsi, {
             lat:         pr.Latitude,
             lon:         pr.Longitude,
             speed:       pr.Sog ?? 0,
             heading:     resolveHeading(pr.TrueHeading ?? 511, pr.Cog ?? 0),
             status:      navStatus(pr.NavigationalStatus ?? 0),
-            destination: (msg.MetaData?.Destination as string | undefined)?.trim() || fixes.get(mmsi)?.destination ?? null,
-            shipName:    (msg.MetaData?.ShipName as string | undefined)?.trim() || fixes.get(mmsi)?.shipName ?? null,
+            destination: ((msg.MetaData?.Destination as string | undefined)?.trim()) || prevDest,
+            shipName:    ((msg.MetaData?.ShipName as string | undefined)?.trim()) || prevName,
           });
         }
 
@@ -191,17 +196,6 @@ Deno.serve(async (req) => {
       updated++;
     })
   );
-
-  // Mark vessels that sent NO fix this cycle as potentially gapped (cron mode only)
-  if (!singleMmsi) {
-    const missedMmsis = mmsiList.filter((m) => !fixes.has(m));
-    if (missedMmsis.length) {
-      await supabase
-        .from("vessels")
-        .update({ ais_gaps_24h: supabase.rpc("ais_gaps_24h_increment" as never) })
-        .in("mmsi", missedMmsis);
-    }
-  }
 
   // Single-MMSI lookup: upsert via RPC (handles new vessels not yet in the DB)
   // and return the vessel row for the frontend.
