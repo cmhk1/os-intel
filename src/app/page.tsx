@@ -17,12 +17,15 @@ export default function Home() {
   const [contactFields, setContactFields] = useState({ name: "", company: "", email: "", message: "" });
   const [contactErrors, setContactErrors] = useState<Record<string, boolean>>({});
 
-  function handleHeroSubmit(e: React.FormEvent) {
+  async function handleHeroSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(heroEmail.trim());
+    const email = heroEmail.trim();
+    const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
     if (!valid) { setHeroError(true); return; }
     setHeroError(false);
     setHeroSubmitted(true);
+    // Save to waitlist (ignore duplicate emails)
+    await getSupabase().from("waitlist").insert([{ email }]);
     router.push("/dashboard");
   }
 
@@ -46,11 +49,11 @@ export default function Home() {
     }]);
     setContactSubmitting(false);
 
-    if (!error) {
-      setContactSuccess(true);
-    } else {
-      console.error(error);
+    if (error) {
+      console.error("Contact form error:", error.message);
+      return;
     }
+    setContactSuccess(true);
   }
 
   return (
