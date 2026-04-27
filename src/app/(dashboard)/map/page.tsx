@@ -250,25 +250,41 @@ export default function MapPage() {
     src?.setData(toGeoJSON(vessels) as any);
   }, [vessels]);
 
+  // Build display list from DB rows (source of truth), enriched with STATIC trade data where IMO matches.
   const mergeWithLive = useCallback((rows: Record<string, unknown>[]): VesselDisplay[] => {
-    const merged = STATIC.map((s) => ({ ...s, live: false }));
-    for (const row of rows) {
-      const idx = merged.findIndex((v) => v.imo === row.imo || v.id === row.id);
-      if (idx < 0) continue;
-      const rawStatus = String(row.last_status ?? "").toLowerCase().replace(/ /g, "_");
-      merged[idx] = {
-        ...merged[idx],
-        lat: Number(row.last_position_lat) || merged[idx].lat,
-        lon: Number(row.last_position_lon) || merged[idx].lon,
-        heading: Number(row.last_heading) || merged[idx].heading,
-        speed: String(row.last_speed ?? merged[idx].speed),
-        status: rawStatus || merged[idx].status,
-        exception: Number(row.ais_gaps_24h) > 0,
-        exceptionType: Number(row.ais_gaps_24h) > 0 ? `AIS gap · ${row.ais_gaps_24h} gaps in 24h` : undefined,
-        live: true,
-      };
-    }
-    return merged;
+    return rows
+      .filter((row) => row.last_position_lat != null && row.last_position_lon != null)
+      .map((row) => {
+        const trade = STATIC.find((s) => s.imo === String(row.imo ?? ""));
+        const rawStatus = String(row.last_status ?? "").toLowerCase().replace(/ /g, "_");
+        const lat = Number(row.last_position_lat);
+        const lon = Number(row.last_position_lon);
+        return {
+          id:            String(row.id),
+          name:          String(row.name ?? trade?.name ?? `MMSI ${row.mmsi ?? ""}`),
+          imo:           String(row.imo ?? trade?.imo ?? String(row.mmsi ?? "")),
+          dealRef:       trade?.dealRef       ?? "—",
+          cargo:         trade?.cargo         ?? "—",
+          quantity:      trade?.quantity      ?? "—",
+          buyer:         trade?.buyer         ?? "—",
+          seller:        trade?.seller        ?? "—",
+          loadPort:      trade?.loadPort      ?? "—",
+          dischargePort: trade?.dischargePort ?? "—",
+          lat,
+          lon,
+          heading:       Number(row.last_heading) || trade?.heading || 0,
+          speed:         String(row.last_speed ?? trade?.speed ?? "0"),
+          eta:           trade?.eta ?? "—",
+          status:        rawStatus || trade?.status || "in_transit",
+          exception:     Number(row.ais_gaps_24h) > 0,
+          exceptionType: Number(row.ais_gaps_24h) > 0 ? `AIS gap · ${row.ais_gaps_24h} gaps in 24h` : undefined,
+          loadLat:       trade?.loadLat       ?? lat,
+          loadLon:       trade?.loadLon       ?? lon,
+          dischargeLat:  trade?.dischargeLat  ?? lat,
+          dischargeLon:  trade?.dischargeLon  ?? lon,
+          live:          true,
+        };
+      });
   }, []);
 
   // ── Map init + data ───────────────────────────────────────────────────────
@@ -400,9 +416,7 @@ export default function MapPage() {
         .channel("live-vessels")
         .on("postgres_changes", { event: "UPDATE", schema: "public", table: "vessels" }, (payload) => {
           const row = payload.new as Record<string, unknown>;
-          const rowId = String(row.id ?? "");
-          const staticEntry = STATIC.find((s) => s.imo === row.imo || s.id === rowId);
-          const targetId = staticEntry?.id ?? rowId;
+          const targetId = String(row.id ?? "");
           if (!targetId) return;
 
           const rawStatus = String(row.last_status ?? "").toLowerCase().replace(/ /g, "_");
@@ -413,8 +427,8 @@ export default function MapPage() {
               v.id === targetId
                 ? {
                     ...v,
-                    lat: Number(row.last_position_lat) || v.lat,
-                    lon: Number(row.last_position_lon) || v.lon,
+                    lat: row.last_position_lat != null ? Number(row.last_position_lat) : v.lat,
+                    lon: row.last_position_lon != null ? Number(row.last_position_lon) : v.lon,
                     heading: Number(row.last_heading) || v.heading,
                     speed: String(row.last_speed ?? v.speed),
                     status: rawStatus || v.status,
