@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import Map, { Marker, Popup, Source, Layer, type MapRef } from "react-map-gl/mapbox";
-import "mapbox-gl/dist/mapbox-gl.css";
+import Map, { Marker, Popup, Source, Layer, type MapRef } from "react-map-gl/maplibre";
+import "maplibre-gl/dist/maplibre-gl.css";
 import { X, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+const CARTO_DARK = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
 
 type VesselStatus = "in_transit" | "loading" | "arriving" | "delayed";
 
@@ -201,26 +201,6 @@ export default function MapPage() {
     } catch {}
   }, [dashStep]);
 
-  if (!MAPBOX_TOKEN) {
-    return (
-      <div className="p-8 max-w-[1600px]">
-        <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-amber mb-2">/ MAP — LIVE</div>
-        <h1 className="font-display text-4xl tracking-tight mb-8">World book</h1>
-        <div className="bg-ink-800/50 border border-ink-600/60 flex flex-col items-center justify-center gap-4" style={{ height: "60vh" }}>
-          <div className="font-mono text-[11px] uppercase tracking-wider text-crimson">Mapbox token required</div>
-          <div className="text-sm text-ink-400 text-center max-w-sm leading-relaxed">
-            Add{" "}
-            <code className="font-mono text-amber bg-ink-700 px-1.5 py-0.5">NEXT_PUBLIC_MAPBOX_TOKEN</code>
-            {" "}to your{" "}
-            <code className="font-mono text-amber bg-ink-700 px-1.5 py-0.5">.env.local</code>
-            {" "}and Vercel environment variables.
-          </div>
-          <div className="font-mono text-[10px] text-ink-500">Free tier at mapbox.com · 50k map loads/month</div>
-        </div>
-      </div>
-    );
-  }
-
   const regularVessels = VESSELS.filter((v) => !v.exception && !v.animateRoute);
   const animatedVessels = VESSELS.filter((v) => !v.exception && v.animateRoute);
   const exceptionVessels = VESSELS.filter((v) => v.exception);
@@ -238,17 +218,17 @@ export default function MapPage() {
         }
         .v-dot { animation: vessel-pulse 2s ease-in-out infinite; }
         .v-dot-crit { animation: vessel-pulse-critical 0.9s ease-in-out infinite; }
-        .mapboxgl-popup-content {
+        .maplibregl-popup-content {
           background: #0f0f0f !important;
           border: 1px solid rgba(31,31,31,0.9) !important;
           border-radius: 0 !important;
           padding: 0 !important;
           box-shadow: 0 8px 32px rgba(0,0,0,0.9) !important;
         }
-        .mapboxgl-popup-tip { border-top-color: #0f0f0f !important; border-bottom-color: #0f0f0f !important; }
-        .mapboxgl-popup-close-button { color: #525252 !important; padding: 4px 8px !important; }
-        .mapboxgl-popup-close-button:hover { color: #f5a524 !important; background: none !important; }
-        .mapboxgl-ctrl-logo, .mapboxgl-ctrl-attrib { display: none !important; }
+        .maplibregl-popup-tip { border-top-color: #0f0f0f !important; border-bottom-color: #0f0f0f !important; }
+        .maplibregl-popup-close-button { color: #525252 !important; padding: 4px 8px !important; }
+        .maplibregl-popup-close-button:hover { color: #f5a524 !important; background: none !important; }
+        .maplibregl-ctrl-logo, .maplibregl-ctrl-attrib { display: none !important; }
       `}</style>
 
       <div className="p-8 max-w-[1600px]">
@@ -284,10 +264,9 @@ export default function MapPage() {
           <div className="flex-1 relative overflow-hidden border border-ink-600/60">
             <Map
               ref={mapRef}
-              mapboxAccessToken={MAPBOX_TOKEN}
               initialViewState={{ longitude: 45, latitude: 18, zoom: 1.9 }}
               style={{ width: "100%", height: "100%" }}
-              mapStyle="mapbox://styles/mapbox/dark-v11"
+              mapStyle={CARTO_DARK}
               dragRotate={false}
               pitchWithRotate={false}
               attributionControl={false}
