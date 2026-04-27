@@ -23,7 +23,7 @@ export default function Home() {
         </p>
 
         <Link
-          href="/terminal"
+          href="/dashboard"
           className="inline-flex items-center gap-2 bg-amber text-ink-900 px-8 py-4 font-medium text-base hover:bg-amber-bright transition"
         >
           Open terminal <ArrowUpRight className="w-5 h-5" />
