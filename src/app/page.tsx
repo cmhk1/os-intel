@@ -1,47 +1,56 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { supabase } from "@/lib/supabase/client";
 
 export default function Home() {
-  const [heroSuccess, setHeroSuccess] = useState(false);
+  const router = useRouter();
+
   const [heroEmail, setHeroEmail] = useState("");
   const [heroError, setHeroError] = useState(false);
+  const [heroSubmitted, setHeroSubmitted] = useState(false);
 
   const [contactSuccess, setContactSuccess] = useState(false);
-  const [contactFields, setContactFields] = useState({
-    name: "",
-    company: "",
-    email: "",
-    message: "",
-  });
+  const [contactSubmitting, setContactSubmitting] = useState(false);
+  const [contactFields, setContactFields] = useState({ name: "", company: "", email: "", message: "" });
   const [contactErrors, setContactErrors] = useState<Record<string, boolean>>({});
 
   function handleHeroSubmit(e: React.FormEvent) {
     e.preventDefault();
     const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(heroEmail.trim());
-    if (!valid) {
-      setHeroError(true);
-      return;
-    }
+    if (!valid) { setHeroError(true); return; }
     setHeroError(false);
-    setHeroSuccess(true);
+    setHeroSubmitted(true);
+    router.push("/dashboard");
   }
 
-  function handleContactSubmit(e: React.FormEvent) {
+  async function handleContactSubmit(e: React.FormEvent) {
     e.preventDefault();
     const required = ["name", "company", "email", "message"] as const;
     const errors: Record<string, boolean> = {};
     let valid = true;
     for (const key of required) {
-      if (!contactFields[key].trim()) {
-        errors[key] = true;
-        valid = false;
-      }
+      if (!contactFields[key].trim()) { errors[key] = true; valid = false; }
     }
     setContactErrors(errors);
     if (!valid) return;
-    setContactSuccess(true);
+
+    setContactSubmitting(true);
+    const { error } = await supabase.from("contact_submissions").insert([{
+      name: contactFields.name.trim(),
+      company: contactFields.company.trim(),
+      email: contactFields.email.trim(),
+      message: contactFields.message.trim(),
+    }]);
+    setContactSubmitting(false);
+
+    if (!error) {
+      setContactSuccess(true);
+    } else {
+      console.error(error);
+    }
   }
 
   return (
@@ -55,7 +64,6 @@ export default function Home() {
         </div>
         <div style={{ marginLeft: "auto", display: "flex", gap: 28 }}>
           <a href="#contact" style={{ color: "#6e6962", textDecoration: "none" }}>Contact</a>
-          <Link href="/dashboard" style={{ color: "#6e6962", textDecoration: "none" }}>Open terminal ↗</Link>
         </div>
       </nav>
 
@@ -91,9 +99,11 @@ export default function Home() {
         </form>
 
         <div style={{ marginTop: 14, fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, letterSpacing: "0.4px" }}>
-          {heroSuccess
-            ? <span style={{ color: "#f5a623" }}>✓ Thanks — we&apos;ll be in touch shortly.</span>
-            : <span style={{ color: "#6e6962" }}>Enter your email to request access</span>
+          {heroSubmitted
+            ? <span style={{ color: "#f5a623" }}>✓ Opening terminal…</span>
+            : heroError
+            ? <span style={{ color: "#ff7b6b" }}>Enter a valid email address</span>
+            : <span style={{ color: "#6e6962" }}>Enter your email to open the terminal</span>
           }
         </div>
       </section>
@@ -165,8 +175,12 @@ export default function Home() {
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: 16, marginTop: 8, paddingTop: 24, borderTop: "1px solid #221f1c" }}>
-                  <button type="submit" style={{ display: "inline-flex", alignItems: "center", gap: 10, padding: "12px 20px", border: "1px solid #f5a623", background: "#f5a623", color: "#1a0f00", fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
-                    Send message ↗
+                  <button
+                    type="submit"
+                    disabled={contactSubmitting}
+                    style={{ display: "inline-flex", alignItems: "center", gap: 10, padding: "12px 20px", border: "1px solid #f5a623", background: "#f5a623", color: "#1a0f00", fontFamily: "'IBM Plex Sans', sans-serif", fontSize: 14, fontWeight: 500, cursor: contactSubmitting ? "not-allowed" : "pointer", opacity: contactSubmitting ? 0.7 : 1 }}
+                  >
+                    {contactSubmitting ? "Sending…" : "Send message ↗"}
                   </button>
                 </div>
               </form>
@@ -175,6 +189,7 @@ export default function Home() {
                 <h3 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontWeight: 500, fontSize: 28, margin: "0 0 8px", letterSpacing: "-0.01em" }}>
                   Thanks — we&apos;ll be in touch <em style={{ fontStyle: "italic", color: "#f5a623" }}>shortly</em>.
                 </h3>
+                <p style={{ color: "#6e6962", margin: 0, fontFamily: "'IBM Plex Mono', monospace", fontSize: 11, letterSpacing: "0.4px" }}>Message received.</p>
               </div>
             )}
           </div>
