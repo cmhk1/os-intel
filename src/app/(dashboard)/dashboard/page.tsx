@@ -29,37 +29,41 @@ const severityStyles: Record<string, string> = {
 };
 
 export default async function DashboardPage() {
-  const supabase = await createClient();
+  let deals: any[] = [], events: any[] = [], triggers: any[] = [], vessels: any[] = [];
 
-  const [
-    { data: deals },
-    { data: events },
-    { data: triggers },
-    { data: vessels },
-  ] = await Promise.all([
-    supabase
-      .from("deals")
-      .select(
-        "id, deal_ref, status, commodity, grade, quantity, unit, price, currency, load_port, discharge_port, ai_risk_score, ai_summary, eta, vessel_id, vessels(name, imo, last_position_lat, last_position_lon), buyer:counterparties!buyer_id(name), seller:counterparties!seller_id(name)"
-      )
-      .order("updated_at", { ascending: false })
-      .limit(10),
-    supabase
-      .from("events")
-      .select("id, event_type, source, severity, payload, occurred_at, deals(deal_ref)")
-      .order("occurred_at", { ascending: false })
-      .limit(8),
-    supabase
-      .from("triggers")
-      .select("id, name, status, action, deals(deal_ref)")
-      .order("created_at", { ascending: false })
-      .limit(5),
-    supabase
-      .from("vessels")
-      .select("id, name, imo, last_position_lat, last_position_lon, last_speed, destination, eta, last_status, last_position_at")
-      .order("last_position_at", { ascending: false })
-      .limit(6),
-  ]);
+  try {
+    const supabase = await createClient();
+    const [d, e, t, v] = await Promise.all([
+      supabase
+        .from("deals")
+        .select(
+          "id, deal_ref, status, commodity, grade, quantity, unit, price, currency, load_port, discharge_port, ai_risk_score, ai_summary, eta, vessel_id, vessels(name, imo, last_position_lat, last_position_lon), buyer:counterparties!buyer_id(name), seller:counterparties!seller_id(name)"
+        )
+        .order("updated_at", { ascending: false })
+        .limit(10),
+      supabase
+        .from("events")
+        .select("id, event_type, source, severity, payload, occurred_at, deals(deal_ref)")
+        .order("occurred_at", { ascending: false })
+        .limit(8),
+      supabase
+        .from("triggers")
+        .select("id, name, status, action, deals(deal_ref)")
+        .order("created_at", { ascending: false })
+        .limit(5),
+      supabase
+        .from("vessels")
+        .select("id, name, imo, last_position_lat, last_position_lon, last_speed, destination, eta, last_status, last_position_at")
+        .order("last_position_at", { ascending: false })
+        .limit(6),
+    ]);
+    deals = d.data || [];
+    events = e.data || [];
+    triggers = t.data || [];
+    vessels = v.data || [];
+  } catch {
+    // Supabase unavailable — render empty state
+  }
 
   const activeDeals = (deals || []).filter(
     (d) => !["settled", "cancelled"].includes(d.status)
