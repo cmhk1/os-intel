@@ -69,13 +69,13 @@ export default async function VesselsPage() {
   const withExceptions = vessels.filter((v) => (v.ais_gaps_24h ?? 0) > 0);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-5 sm:space-y-6">
       {/* Header */}
       <div>
         <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-amber mb-1">
           / VESSELS
         </div>
-        <h1 className="font-display text-3xl tracking-tight">Fleet</h1>
+        <h1 className="font-display text-2xl sm:text-3xl tracking-tight">Fleet</h1>
       </div>
 
       {fetchError && (
@@ -99,19 +99,19 @@ export default async function VesselsPage() {
             danger: withExceptions.length > 0,
           },
         ].map((k) => (
-          <div key={k.label} className="bg-ink-800/60 px-5 py-4">
-            <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-400 mb-2">
+          <div key={k.label} className="bg-ink-800/60 px-3 py-3 sm:px-5 sm:py-4">
+            <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-400 mb-1.5 sm:mb-2">
               {k.label}
             </div>
             <div
               className={cn(
-                "font-display text-3xl text-tabular",
+                "font-display text-2xl sm:text-3xl text-tabular",
                 "danger" in k && k.danger ? "text-crimson" : "text-amber"
               )}
             >
               {k.value}
             </div>
-            <div className="font-mono text-[10px] text-ink-500 uppercase tracking-wider mt-1">
+            <div className="hidden sm:block font-mono text-[10px] text-ink-500 uppercase tracking-wider mt-1">
               {k.sub}
             </div>
           </div>
@@ -126,9 +126,9 @@ export default async function VesselsPage() {
           </div>
         </div>
       ) : (
-        <div className="border border-ink-600/30">
+        <div className="border border-ink-600/30 overflow-x-auto">
           {/* Column headers */}
-          <div className="grid grid-cols-[20px_1fr_140px_80px_160px_110px_90px] gap-4 px-5 py-2.5 border-b border-ink-600/40 bg-ink-800/40">
+          <div className="grid grid-cols-[20px_1fr_140px_80px_160px_110px_90px] gap-4 px-5 py-2.5 border-b border-ink-600/40 bg-ink-800/40 min-w-[720px]">
             {["", "Vessel", "Type / Flag", "Speed", "Destination", "Last seen", ""].map(
               (col, i) => (
                 <div
@@ -145,7 +145,7 @@ export default async function VesselsPage() {
           {vessels.map((v) => (
             <div
               key={v.id}
-              className="grid grid-cols-[20px_1fr_140px_80px_160px_110px_90px] gap-4 items-center px-5 py-3 border-b border-ink-600/40 hover:bg-ink-700/20 transition-colors"
+              className="grid grid-cols-[20px_1fr_140px_80px_160px_110px_90px] gap-4 items-center px-5 py-3 border-b border-ink-600/40 hover:bg-ink-700/20 transition-colors min-w-[720px]"
             >
               {/* Status dot */}
               <div className="flex items-center justify-center">

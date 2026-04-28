@@ -104,13 +104,15 @@ export default function CommandBar() {
       {/* Static topbar search trigger */}
       <button
         onClick={() => setOpen(true)}
-        className="flex items-center gap-2 bg-ink-700/60 border border-ink-600 px-3 py-1.5 rounded-sm w-96 max-w-[40vw] text-left hover:border-ink-500 transition-colors"
+        aria-label="Search"
+        className="flex items-center gap-2 bg-ink-700/60 border border-ink-600 rounded-sm hover:border-ink-500 transition-colors text-left
+                   p-2 sm:px-3 sm:py-1.5 sm:w-72 md:w-96 md:max-w-[40vw]"
       >
         <Search className="w-3.5 h-3.5 text-ink-400 shrink-0" />
-        <span className="text-sm flex-1 text-ink-400 font-mono">
+        <span className="hidden sm:inline text-sm flex-1 text-ink-400 font-mono truncate">
           Search deals, vessels, counterparties…
         </span>
-        <div className="flex items-center gap-1 text-[10px] font-mono text-ink-400 bg-ink-600/60 px-1.5 py-0.5 rounded-sm shrink-0">
+        <div className="hidden md:flex items-center gap-1 text-[10px] font-mono text-ink-400 bg-ink-600/60 px-1.5 py-0.5 rounded-sm shrink-0">
           <Command className="w-2.5 h-2.5" />K
         </div>
       </button>
@@ -118,12 +120,12 @@ export default function CommandBar() {
       {/* Modal overlay */}
       {open && (
         <div
-          className="fixed inset-0 z-[200] flex items-start justify-center pt-[15vh] bg-black/60 backdrop-blur-sm"
+          className="fixed inset-0 z-[200] flex items-start justify-center pt-[10vh] sm:pt-[15vh] bg-black/60 backdrop-blur-sm px-4"
           onClick={() => setOpen(false)}
         >
           <div
             ref={panelRef}
-            className="max-w-lg w-full mx-4 bg-ink-900 border border-ink-600/60 shadow-2xl"
+            className="max-w-lg w-full bg-ink-900 border border-ink-600/60 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Input row */}

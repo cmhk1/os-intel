@@ -526,33 +526,34 @@ export default function MapPage() {
         .maplibregl-ctrl-group button:hover{background:rgba(245,165,36,.1)!important}
       `}</style>
 
-      <div style={{ position: "relative", width: "100%", height: "calc(100vh - 56px)", overflow: "hidden" }}>
+      <div className="relative w-full overflow-hidden h-[calc(100dvh-56px)]">
         <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />
 
         {/* Top vignette */}
-        <div className="absolute top-0 inset-x-0 h-32 bg-gradient-to-b from-black/80 to-transparent pointer-events-none z-10" />
+        <div className="absolute top-0 inset-x-0 h-24 sm:h-32 bg-gradient-to-b from-black/80 to-transparent pointer-events-none z-10" />
 
         {/* Header */}
-        <div className="absolute top-5 left-6 z-20">
-          <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-amber mb-1">/ MAP — LIVE</div>
-          <h1 className="font-display text-3xl tracking-tight drop-shadow-lg">World book</h1>
+        <div className="absolute top-3 left-3 sm:top-5 sm:left-6 z-20">
+          <div className="font-mono text-[9px] sm:text-[10px] uppercase tracking-[0.3em] text-amber mb-1">/ MAP — LIVE</div>
+          <h1 className="font-display text-2xl sm:text-3xl tracking-tight drop-shadow-lg">World book</h1>
         </div>
 
         {/* Status strip — top right */}
-        <div className="absolute top-5 right-6 z-20 flex items-center gap-3">
+        <div className="absolute top-3 right-3 sm:top-5 sm:right-6 z-20 flex items-center gap-2 sm:gap-3">
           {exceptions.length > 0 && (
-            <div className="flex items-center gap-1.5 font-mono text-[10px] text-crimson uppercase tracking-wider bg-black/70 px-2.5 py-1.5 border border-crimson/30 backdrop-blur-sm">
+            <div className="flex items-center gap-1.5 font-mono text-[10px] text-crimson uppercase tracking-wider bg-black/70 px-2 sm:px-2.5 py-1 sm:py-1.5 border border-crimson/30 backdrop-blur-sm">
               <span className="w-1.5 h-1.5 rounded-full bg-crimson animate-pulse" />
-              {exceptions.length} exception{exceptions.length !== 1 ? "s" : ""}
+              <span className="hidden sm:inline">{exceptions.length} exception{exceptions.length !== 1 ? "s" : ""}</span>
+              <span className="sm:hidden">{exceptions.length}</span>
             </div>
           )}
-          <div className="flex items-center gap-1.5 font-mono text-[10px] bg-black/70 px-2.5 py-1.5 border border-ink-600/40 backdrop-blur-sm">
+          <div className="flex items-center gap-1.5 font-mono text-[10px] bg-black/70 px-2 sm:px-2.5 py-1 sm:py-1.5 border border-ink-600/40 backdrop-blur-sm">
             <Radio className={cn("w-3 h-3", liveCount > 0 ? "text-emerald" : "text-ink-500")} />
             <span className={liveCount > 0 ? "text-emerald" : "text-ink-400"}>
               {liveCount > 0 ? `${liveCount} live` : "connecting"}
             </span>
             {lastUpdated && (
-              <span className="text-ink-500 ml-1" suppressHydrationWarning>
+              <span className="hidden sm:inline text-ink-500 ml-1" suppressHydrationWarning>
                 · {relativeTime(lastUpdated)}
               </span>
             )}
@@ -560,50 +561,70 @@ export default function MapPage() {
         </div>
 
         {/* Bottom vignette */}
-        <div className="absolute bottom-0 inset-x-0 h-40 bg-gradient-to-t from-black/90 to-transparent pointer-events-none z-10" />
+        <div className="absolute bottom-0 inset-x-0 h-32 sm:h-40 bg-gradient-to-t from-black/90 to-transparent pointer-events-none z-10" />
 
         {/* KPI strip */}
-        <div className="absolute bottom-6 left-6 right-6 z-20 grid grid-cols-3 gap-px bg-ink-600/30 border border-ink-600/30">
+        <div className="absolute bottom-3 left-3 right-3 sm:bottom-6 sm:left-6 sm:right-6 z-20 grid grid-cols-3 gap-px bg-ink-600/30 border border-ink-600/30">
           {[
-            { label: "Vessels at sea", value: String(vessels.filter((v) => v.status === "in_transit" || v.status === "under_way_using_engine").length), sub: "in transit", danger: false },
-            { label: "Notional", value: "$1.2B", sub: "gross at sea", danger: false },
-            { label: "Exceptions", value: String(exceptions.length), sub: "needs action", danger: exceptions.length > 0 },
+            { label: "At sea", longLabel: "Vessels at sea", value: String(vessels.filter((v) => v.status === "in_transit" || v.status === "under_way_using_engine").length), sub: "in transit", danger: false },
+            { label: "Notional", longLabel: "Notional", value: "$1.2B", sub: "gross at sea", danger: false },
+            { label: "Exceptions", longLabel: "Exceptions", value: String(exceptions.length), sub: "needs action", danger: exceptions.length > 0 },
           ].map((k) => (
-            <div key={k.label} className="bg-black/75 backdrop-blur-sm px-6 py-4">
-              <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-400 mb-2">{k.label}</div>
-              <div className={cn("font-display text-3xl text-tabular", k.danger ? "text-crimson" : "text-amber")}>{k.value}</div>
-              <div className="font-mono text-[10px] text-ink-500 uppercase tracking-wider mt-1">{k.sub}</div>
+            <div key={k.label} className="bg-black/75 backdrop-blur-sm px-3 py-2.5 sm:px-6 sm:py-4">
+              <div className="font-mono text-[9px] sm:text-[10px] uppercase tracking-[0.2em] text-ink-400 mb-1 sm:mb-2">
+                <span className="hidden sm:inline">{k.longLabel}</span>
+                <span className="sm:hidden">{k.label}</span>
+              </div>
+              <div className={cn("font-display text-xl sm:text-3xl text-tabular", k.danger ? "text-crimson" : "text-amber")}>{k.value}</div>
+              <div className="hidden sm:block font-mono text-[10px] text-ink-500 uppercase tracking-wider mt-1">{k.sub}</div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Vessel detail slide-over */}
+      {/* Vessel detail — bottom sheet on mobile, right slide-over on desktop */}
       {selected && (
         <div className="fixed inset-0 z-50" onClick={() => setSelected(null)}>
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
           <div
-            className="absolute right-0 top-0 h-full w-[380px] bg-ink border-l border-ink-600/60 overflow-y-auto"
+            role="dialog"
+            aria-label={`Vessel ${selected.name}`}
+            className={cn(
+              "absolute bg-ink border-ink-600/60 overflow-y-auto",
+              // mobile: bottom sheet
+              "inset-x-0 bottom-0 max-h-[85dvh] border-t rounded-t-lg",
+              // desktop: right drawer
+              "md:inset-x-auto md:bottom-auto md:right-0 md:top-0 md:h-full md:max-h-none md:w-[380px] md:border-t-0 md:border-l md:rounded-none"
+            )}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-6 py-4 border-b border-ink-600/60 flex items-center justify-between sticky top-0 bg-ink z-10">
-              <div>
+            {/* Mobile drag handle */}
+            <div className="md:hidden flex justify-center pt-2 pb-1">
+              <div className="w-10 h-1 rounded-full bg-ink-500" />
+            </div>
+
+            <div className="px-5 sm:px-6 py-3 sm:py-4 border-b border-ink-600/60 flex items-center justify-between sticky top-0 bg-ink z-10">
+              <div className="min-w-0">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="font-mono text-[10px] text-amber uppercase tracking-wider">{selected.dealRef}</span>
+                  <span className="font-mono text-[10px] text-amber uppercase tracking-wider truncate">{selected.dealRef}</span>
                   {selected.live && (
                     <span className="flex items-center gap-1 font-mono text-[9px] text-emerald uppercase tracking-wider">
                       <span className="w-1 h-1 rounded-full bg-emerald animate-pulse" /> live
                     </span>
                   )}
                 </div>
-                <div className="font-mono text-sm text-white">{selected.name}</div>
+                <div className="font-mono text-sm text-white truncate">{selected.name}</div>
               </div>
-              <button onClick={() => setSelected(null)} className="text-ink-400 hover:text-white transition-colors p-1">
+              <button
+                onClick={() => setSelected(null)}
+                aria-label="Close vessel details"
+                className="text-ink-400 hover:text-white transition-colors p-2 -mr-2 shrink-0"
+              >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="p-6 space-y-6">
+            <div className="p-5 sm:p-6 space-y-6 pb-[calc(env(safe-area-inset-bottom,0)+1.5rem)]">
               {selected.exception && (
                 <div className="bg-crimson/5 border border-crimson/30 px-4 py-3">
                   <div className="font-mono text-[10px] text-crimson uppercase tracking-wider mb-1">⚠ Exception</div>

@@ -202,11 +202,11 @@ export default function AgentsPage() {
   return (
     <div className="flex flex-col min-h-full">
       {/* Header */}
-      <div className="px-8 pt-8 pb-5 border-b border-ink-600/60">
+      <div className="px-4 sm:px-8 pt-5 sm:pt-8 pb-4 sm:pb-5 border-b border-ink-600/60">
         <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-amber mb-2">/ AGENTS</div>
-        <div className="flex items-end justify-between">
+        <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h1 className="font-display text-4xl tracking-tight">Operating system</h1>
+            <h1 className="font-display text-3xl sm:text-4xl tracking-tight">Operating system</h1>
             <p className="font-mono text-[11px] text-ink-300 mt-1.5">
               {AGENTS.length} agents running across 47 active trades. {visibleExceptions.length} exceptions waiting on you.
             </p>
@@ -218,11 +218,11 @@ export default function AgentsPage() {
         </div>
       </div>
 
-      {/* Three-column body */}
-      <div className="flex flex-1 overflow-hidden">
+      {/* Body — stacks on mobile, 3-column on lg+ */}
+      <div className="flex flex-col lg:flex-row flex-1 lg:overflow-hidden">
 
         {/* Left rail — agent list */}
-        <aside className="w-60 border-r border-ink-600/60 overflow-y-auto shrink-0">
+        <aside className="w-full lg:w-60 border-b lg:border-b-0 lg:border-r border-ink-600/60 lg:overflow-y-auto shrink-0">
           <div className="px-4 py-3 border-b border-ink-600/60">
             <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-400">Agents</span>
           </div>
@@ -250,7 +250,7 @@ export default function AgentsPage() {
         </aside>
 
         {/* Center — activity feed */}
-        <main className="flex-1 overflow-y-auto border-r border-ink-600/60">
+        <main className="flex-1 lg:overflow-y-auto border-b lg:border-b-0 lg:border-r border-ink-600/60">
           <div className="px-5 py-3 border-b border-ink-600/60 flex items-center justify-between sticky top-0 bg-ink/95 backdrop-blur z-10">
             <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-400">
               Activity · {visibleFeed.length} events
@@ -329,7 +329,7 @@ export default function AgentsPage() {
         </main>
 
         {/* Right panel — exceptions */}
-        <aside className="w-[340px] shrink-0 overflow-y-auto">
+        <aside className="w-full lg:w-[340px] shrink-0 lg:overflow-y-auto">
           <div className="px-4 py-3 border-b border-ink-600/60">
             <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-crimson">
               Exceptions · {visibleExceptions.length}
@@ -386,8 +386,8 @@ export default function AgentsPage() {
       </div>
 
       {/* Sticky bottom bar */}
-      <div className="sticky bottom-0 border-t border-ink-600/60 bg-ink/95 backdrop-blur px-8 py-3 flex items-center gap-6 z-10">
-        <div className="flex items-center gap-6 font-mono text-[10px] text-ink-400 flex-1">
+      <div className="sticky bottom-0 border-t border-ink-600/60 bg-ink/95 backdrop-blur px-4 sm:px-8 py-3 flex flex-wrap items-center gap-3 sm:gap-6 z-10">
+        <div className="flex items-center gap-4 sm:gap-6 font-mono text-[10px] text-ink-400 flex-1 min-w-0 flex-wrap">
           {[
             { label: "agents", value: AGENTS.length },
             { label: "active trades", value: 47 },
@@ -401,12 +401,11 @@ export default function AgentsPage() {
             </span>
           ))}
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex-1 flex items-center gap-2">
-            <span className="font-mono text-[10px] text-ink-400 shrink-0">95% auto-processed this week</span>
-            <div className="w-32 h-1.5 bg-ink-700 border border-ink-600/60 overflow-hidden">
-              <div className="h-full bg-amber" style={{ width: "95%" }} />
-            </div>
+        <div className="flex items-center gap-2 ml-auto">
+          <span className="hidden sm:inline font-mono text-[10px] text-ink-400 shrink-0">95% auto-processed this week</span>
+          <span className="sm:hidden font-mono text-[10px] text-ink-400 shrink-0">95% auto</span>
+          <div className="w-20 sm:w-32 h-1.5 bg-ink-700 border border-ink-600/60 overflow-hidden">
+            <div className="h-full bg-amber" style={{ width: "95%" }} />
           </div>
         </div>
       </div>

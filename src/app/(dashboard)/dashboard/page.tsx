@@ -67,14 +67,14 @@ export default function DashboardPage() {
   const flagged = MOCK_DEALS.filter((d) => d.ai_risk_score >= 60).length;
 
   return (
-    <div className="p-8 max-w-[1600px]">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px]">
       {/* Header */}
-      <div className="flex items-end justify-between mb-8">
+      <div className="flex flex-wrap items-end justify-between gap-3 mb-6 sm:mb-8">
         <div>
           <div className="font-mono text-[10px] uppercase tracking-[0.3em] text-amber mb-2">
             / TERMINAL
           </div>
-          <h1 className="font-display text-4xl tracking-tight">Overview</h1>
+          <h1 className="font-display text-3xl sm:text-4xl tracking-tight">Overview</h1>
         </div>
         <Link
           href="/deals"
@@ -85,16 +85,16 @@ export default function DashboardPage() {
       </div>
 
       {/* KPI strip */}
-      <div className="grid grid-cols-4 gap-px bg-ink-600/60 border border-ink-600/60 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-ink-600/60 border border-ink-600/60 mb-6 sm:mb-8">
         <KPI label="Active deals" value={activeDeals.length.toString()} sub={`${MOCK_DEALS.length} total`} />
         <KPI label="Notional" value={`$${(tvlUsd / 1e6).toFixed(0)}M`} sub="gross value" accent />
         <KPI label="Flagged" value={flagged.toString()} sub="risk ≥ 60" danger={flagged > 0} />
         <KPI label="Armed triggers" value="4" sub="awaiting events" />
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Deals */}
-        <section className="col-span-2 bg-ink-800/50 border border-ink-600/60">
+        <section className="lg:col-span-2 bg-ink-800/50 border border-ink-600/60">
           <div className="flex items-center justify-between px-5 py-3 border-b border-ink-600/60">
             <div className="flex items-center gap-2">
               <GitBranch className="w-3.5 h-3.5 text-amber" />
@@ -107,24 +107,24 @@ export default function DashboardPage() {
 
           <div className="divide-y divide-ink-600/40">
             {MOCK_DEALS.map((d) => (
-              <div key={d.id} className="block px-5 py-4">
-                <div className="flex items-center gap-4">
+              <div key={d.id} className="block px-4 sm:px-5 py-3 sm:py-4">
+                <div className="flex items-center gap-3 sm:gap-4 flex-wrap sm:flex-nowrap">
                   <span className={cn(
-                    "font-mono text-[10px] uppercase px-1.5 py-0.5 border tracking-wider min-w-[90px] text-center",
+                    "font-mono text-[10px] uppercase px-1.5 py-0.5 border tracking-wider min-w-[90px] text-center shrink-0",
                     statusStyles[d.status] || "text-ink-300 bg-ink-600/40 border-ink-500"
                   )}>
                     {d.status.replace("_", " ")}
                   </span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0 order-3 sm:order-none w-full sm:w-auto">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-mono text-sm text-white">{d.deal_ref}</span>
                       <span className="text-sm text-ink-300 truncate">{d.commodity} · {d.grade}</span>
                     </div>
-                    <div className="text-[11px] text-ink-400 mt-0.5 font-mono">
+                    <div className="text-[11px] text-ink-400 mt-0.5 font-mono truncate">
                       {d.load_port} → {d.discharge_port}{d.vessels?.name ? ` · ${d.vessels.name}` : ""}
                     </div>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right ml-auto sm:ml-0">
                     <div className="font-mono text-sm text-tabular">
                       ${((d.price * d.quantity) / 1e6).toFixed(1)}M
                     </div>
@@ -132,7 +132,7 @@ export default function DashboardPage() {
                       {(d.quantity / 1e6).toFixed(1)}M {d.unit}
                     </div>
                   </div>
-                  <div className="w-14 text-center">
+                  <div className="w-12 sm:w-14 text-center shrink-0">
                     <div className={cn(
                       "font-mono text-sm text-tabular",
                       d.ai_risk_score >= 60 ? "text-crimson" : d.ai_risk_score >= 30 ? "text-amber" : "text-emerald"
@@ -214,9 +214,9 @@ function KPI({ label, value, sub, accent, danger }: {
   label: string; value: string; sub?: string; accent?: boolean; danger?: boolean;
 }) {
   return (
-    <div className="bg-ink p-5">
-      <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-400 mb-3">{label}</div>
-      <div className={cn("font-display text-4xl text-tabular", accent && "text-amber", danger && "text-crimson")}>
+    <div className="bg-ink p-4 sm:p-5">
+      <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-400 mb-2 sm:mb-3">{label}</div>
+      <div className={cn("font-display text-3xl sm:text-4xl text-tabular", accent && "text-amber", danger && "text-crimson")}>
         {value}
       </div>
       {sub && <div className="font-mono text-[10px] text-ink-400 uppercase tracking-wider mt-1">{sub}</div>}
